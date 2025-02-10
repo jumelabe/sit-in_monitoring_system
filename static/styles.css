@@ -1,0 +1,165 @@
+body {
+    height: 100vh;
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #f5f5f5;
+    font-family: Arial, sans-serif;
+  }
+  
+  .login-container {
+    display: flex;
+    width: 800px;
+    background: #fff;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.2);
+  }
+  
+  .login-form {
+    width: 50%;
+    padding: 40px;
+  }
+  
+  .login-form h2 {
+    margin-bottom: 20px;
+    font-weight: bold;
+  }
+  
+  .login-form .form-control {
+    margin-bottom: 15px;
+    border-radius: 25px;
+    padding: 10px;
+    border: 1px solid #ccc;
+  }
+  
+  .remember-me {
+    margin-bottom: 15px;
+  }
+  
+  .login-form button.btn-gradient {
+    width: 100%;
+    border-radius: 25px;
+    background: linear-gradient(45deg, #4a3599, #faf741);
+    color: white;
+    padding: 10px;
+    border: none;
+    transition: background 0.3s ease;
+  }
+  
+  .login-form button.btn-gradient:hover {
+    background: linear-gradient(45deg, #4a3599, #faf741);
+  }
+  
+  .forgot-password {
+    text-align: right;
+    margin-top: 10px;
+  }
+  
+  .forgot-password a {
+    text-decoration: none;
+    color: #555;
+    font-size: 0.9em;
+  }
+  
+  .login-info {
+    width: 50%;
+    background: linear-gradient(45deg, #4a3599, #4a3599);
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 40px;
+  }
+  
+  .login-info h2 {
+    font-weight: bold;
+    margin-bottom: 15px;
+  }
+  
+  .login-info p {
+    margin-bottom: 20px;
+  }
+  
+  .login-info a.btn.btn-outline {
+    color: white;
+    border: 1px solid white;
+    padding: 8px 20px;
+    border-radius: 25px;
+    text-decoration: none;
+    transition: background 0.3s ease, color 0.3s ease;
+  }
+  
+  .login-info a.btn.btn-outline:hover {
+    background: white;
+    color: #030303;
+  }
+
+  .register-container {
+    width: 400px;
+    background: white;
+    border-radius: 10px;
+    padding: 30px;
+    box-shadow: 0px 5px 15px rgba(0,0,0,0.2);
+    text-align: center;
+}
+
+.register-form h2 {
+    margin-bottom: 20px;
+    font-weight: bold;
+}
+
+.register-form .form-control {
+    width: 100%;
+    margin-bottom: 15px;
+    border-radius: 25px;
+    padding: 12px;
+    border: 1px solid #ccc;
+}
+
+.register-form button.btn-gradient {
+    width: 100%;
+    border-radius: 25px;
+    background: linear-gradient(45deg, 4a3599, 4a3599);
+    color: #4a3599;
+    padding: 12px;
+    border: none;
+    font-size: 16px;
+    font-weight: bold;
+    transition: background 0.3s ease;
+}
+
+
+.register-form p {
+    margin-top: 10px;
+}
+
+.register-form a {
+    color: #9956e6;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.flash-messages {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  width: 90%;
+  max-width: 500px;
+}
+
+.flash-messages .alert {
+  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+  opacity: 0.95;
+}
+
+.login-logo {
+    width: 100px; /* Adjust size */
+    height: auto;
+    margin-bottom: 10px; /* Add spacing */
+}
+
