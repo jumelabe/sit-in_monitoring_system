@@ -15,7 +15,9 @@
 
             <div class="profile" id="profileBtn">
                 <div class="profile-pic"></div>
-                <div class="profile-name">Jumel Anthony</div>
+                <div class="profile-name">
+                    {{ user['firstname'] }} {{ user['lastname'] }}
+                </div>
             </div>
 
             <button class="menu-btn">Announcement</button>
@@ -31,54 +33,6 @@
             <!-- Main content goes here -->
         </div>
     </div>
-
-    <div class="modal" id="profileModal">
-        <div class="modal-content">
-            <span class="close-btn">&times;</span>
-            <h2>Edit Profile</h2>
-            <form id="profileForm">
-                <label for="name">Name:</label>
-                <input type="text" id="name" value="Jumel Anthony">
-    
-                <label for="email">Email:</label>
-                <input type="email" id="email" value="jumel@example.com">
-    
-                <label for="password">New Password:</label>
-                <input type="password" id="password">
-    
-                <button type="submit">Save Changes</button>
-            </form>
-        </div>
-    </div>
-    
-    <script>
-            document.addEventListener("DOMContentLoaded", function () {
-        const profileBtn = document.getElementById("profileBtn");
-        const modal = document.getElementById("profileModal");
-        const closeBtn = document.querySelector(".close-btn");
-
-        profileBtn.addEventListener("click", function () {
-            modal.style.display = "flex";
-        });
-
-        closeBtn.addEventListener("click", function () {
-            modal.style.display = "none";
-        });
-
-        window.addEventListener("click", function (event) {
-            if (event.target === modal) {
-                modal.style.display = "none";
-            }
-        });
-
-        document.getElementById("profileForm").addEventListener("submit", function (event) {
-            event.preventDefault();
-            alert("Profile updated successfully!");
-            modal.style.display = "none";
-        });
-    });
-
-    </script>
 
     <script>
         // Automatically hide flash messages after 3 seconds

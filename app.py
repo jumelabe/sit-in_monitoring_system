@@ -21,15 +21,16 @@ def login():
         user = cursor.fetchone()
         conn.close()
 
-        if user and user["password"] == password:  # Direct password check
-            session['user_id'] = user["idno"]
+        if user and user["password"] == password:  # Password check (consider hashing)
+            session['user_id'] = user["idno"]  # Store the logged-in user ID in session
             flash("Login successful!", "success")
-            return redirect(url_for('index'))
+            return redirect(url_for('index'))  # Redirect to dashboard
         else:
             flash("Invalid credentials, please try again.", "danger")
             return redirect(url_for('login'))
-    
+
     return render_template('login.html')
+
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -71,6 +72,26 @@ def register():
 
     return render_template('register.html')
 
+@app.route('/profile')
+def profile():
+    if 'user_id' not in session:
+        flash("Please log in first!", "warning")
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT idno, firstname, lastname, midname, course, year_level, email_address, username FROM students WHERE idno = ?", (session['user_id'],))
+    user = cursor.fetchone()
+    conn.close()
+
+    if not user:
+        flash("User not found!", "danger")
+        return redirect(url_for('logout'))
+
+    return render_template('profile.html', user=user)
+
+
+
 @app.route('/')
 @app.route('/index')
 def index():
@@ -78,7 +99,19 @@ def index():
         flash("Please log in first!", "warning")
         return redirect(url_for('login'))
 
-    return render_template('dashboard.html')
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT firstname, lastname FROM students WHERE idno = ?", (session['user_id'],))
+    user = cursor.fetchone()
+    conn.close()
+
+    if not user:
+        flash("User not found!", "danger")
+        return redirect(url_for('logout'))  # Logout if user not found
+
+    return render_template('dashboard.html', user=user)
+
+
 
 @app.route('/logout')
 def logout():
