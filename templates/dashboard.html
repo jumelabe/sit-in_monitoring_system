@@ -13,12 +13,14 @@
         <div class="sidebar">
             <h1 class="dashboard-title">Dashboard</h1>
 
-            <div class="profile" id="profileBtn">
-                <div class="profile-pic"></div>
-                <div class="profile-name">
-                    {{ user['firstname'] }} {{ user['lastname'] }}
+            <a href="{{ url_for('profile') }}" class="profile-link">
+                <div class="profile">
+                    <div class="profile-pic"></div>
+                    <div class="profile-name">
+                        {{ user['firstname'] }} {{ user['lastname'] }}
+                    </div>
                 </div>
-            </div>
+            </a>
 
             <button class="menu-btn">Announcement</button>
             <button class="menu-btn">Remaining Session</button>
@@ -26,7 +28,6 @@
             <button class="menu-btn">Lab Rules & Regulations</button>
             <button class="menu-btn">Sit-In History</button>
             <button class="menu-btn">Reservation</button>
-            <a href="/logout" class="btn btn-danger">Logout</a>
         </div>
         
         <div class="content">
@@ -48,3 +49,5 @@
 
 </body>
 </html>
+
+
