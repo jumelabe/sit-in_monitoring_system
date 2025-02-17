@@ -2,6 +2,7 @@ import sqlite3
 import os
 from flask import Flask, request, redirect, url_for, flash, render_template, session
 from werkzeug.utils import secure_filename
+from PIL import Image
 
 app = Flask(__name__)
 app.secret_key = 'kaon aron di ma brother'  # Secret key for session management
@@ -17,6 +18,11 @@ def get_db_connection():
     conn = sqlite3.connect('users.db')
     conn.row_factory = sqlite3.Row
     return conn
+
+def resize_image(image_path, size=(150, 150)):
+    with Image.open(image_path) as img:
+        img = img.resize(size, Image.ANTIALIAS)
+        img.save(image_path, quality=95)
 
 @app.route('/edit_profile', methods=['POST'])
 def edit_profile():
@@ -39,6 +45,7 @@ def edit_profile():
         filename = secure_filename(profile_picture.filename)
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         profile_picture.save(file_path)
+        resize_image(file_path)  # Resize the image
         profile_picture_url = f'static/uploads/{filename}'
 
     conn = get_db_connection()
@@ -70,7 +77,7 @@ def edit_profile():
     finally:
         conn.close()
 
-    return redirect(url_for('profile'))
+    return redirect(url_for('dashboard'))
 
     
 
@@ -137,17 +144,19 @@ def register():
 
     return render_template('register.html')
 
-@app.route('/profile')
-def profile():
+
+@app.route('/dashboard', methods=['GET', 'POST'])
+def dashboard():
     if 'user_id' not in session:
         flash("Please log in first!", "warning")
         return redirect(url_for('login'))
 
     conn = get_db_connection()
     cursor = conn.cursor()
-    
+
+    # Fetch user information
     cursor.execute("""
-        SELECT idno, firstname, lastname, midname, course, year_level, email_address, username, profile_picture 
+        SELECT idno, firstname, lastname, midname, course, year_level, email_address, profile_picture, session_count
         FROM students WHERE idno = ?
     """, (session['user_id'],))
     
@@ -158,39 +167,43 @@ def profile():
         flash("User not found!", "danger")
         return redirect(url_for('logout'))
 
-    user = {
-        "idno": user[0],
-        "firstname": user[1],
-        "lastname": user[2],
-        "midname": user[3],
-        "course": user[4],
-        "year_level": user[5],
-        "email_address": user[6],
-        "username": user[7],
-        "profile_picture": user[8] if user[8] else url_for('static', filename='default-avatar.jpg')
+    # Convert user data into a dictionary for Jinja template
+    user_data = {
+        "idno": user["idno"],
+        "firstname": user["firstname"],
+        "lastname": user["lastname"],
+        "midname": user["midname"],
+        "course": user["course"] or "N/A",  # Default if empty
+        "year_level": user["year_level"] or "N/A",  # Default if empty
+        "email_address": user["email_address"] or "N/A",  # Default if empty
+        "profile_picture": user["profile_picture"] if user["profile_picture"] else None,  # None if not set
+        "session_count": user["session_count"] if user["session_count"] else 0
     }
 
-    return render_template('profile.html', user=user)
+    # If the form is submitted, update the user information
+    if request.method == 'POST':
+        new_course = request.form['course']
+        new_year_level = request.form['year_level']
+        new_email = request.form['email_address']
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            UPDATE students
+            SET course = ?, year_level = ?, email_address = ?
+            WHERE idno = ?
+        """, (new_course, new_year_level, new_email, session['user_id']))
+        
+        conn.commit()
+        conn.close()
+
+        flash("Student information updated successfully!", "success")
+        return redirect(url_for('dashboard'))
+
+    return render_template('dashboard.html', user=user_data)
 
 
-@app.route('/')
-@app.route('/dashboard')
-def dashboard():
-    if 'user_id' not in session:
-        flash("Please log in first!", "warning")
-        return redirect(url_for('login'))
-
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT firstname, lastname FROM students WHERE idno = ?", (session['user_id'],))
-    user = cursor.fetchone()
-    conn.close()
-
-    if not user:
-        flash("User not found!", "danger")
-        return redirect(url_for('logout'))
-
-    return render_template('dashboard.html', user=user) 
 
 @app.route('/logout')
 def logout():
@@ -199,6 +212,6 @@ def logout():
     return redirect(url_for('login'))
 
 if __name__ == '__main__':
-    app.run(debug=True)     
+    app.run(debug=True)
 
-    
+

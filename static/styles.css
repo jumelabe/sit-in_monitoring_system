@@ -184,7 +184,7 @@ body {
 .login-form button.btn-gradient {
   width: 100%;
   border-radius: 25px;
-  background: #ddd4fc;
+  background: #4a3599;
   color: white;
   padding: 10px;
   border: none;
@@ -233,6 +233,10 @@ body {
 }
 
 .login-info a.btn.btn-outline:hover {
+  background: #ddd4fc;
+  color: #030303;
+}
+.login-form .btn.btn-gradient:hover {
   background: #ddd4fc;
   color: #030303;
 }
