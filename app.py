@@ -21,7 +21,7 @@ def get_db_connection():
 
 def resize_image(image_path, size=(150, 150)):
     with Image.open(image_path) as img:
-        img = img.resize(size, Image.ANTIALIAS)
+        img = img.resize(size, Image.LANCZOS)
         img.save(image_path, quality=95)
 
 @app.route('/')
