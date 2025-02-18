@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Sit-in History{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+  <div class="sidebar">
+    <h1 class="dashboard-title">History Information</h1>
+    <a href="{{ url_for('dashboard') }}" class="menu-btn">Dashboard</a>
+    <a href="{{ url_for('sit_in_history') }}" class="menu-btn active">Sit-In History</a>
+    <button class="menu-btn">Reservation</button>
+    <a href="{{ url_for('logout') }}" class="menu-btn logout-btn">Logout</a>
+  </div>
+  
+  <div class="content">
+    <h2>Sit-in History</h2>
+    <div class="filter-section">
+      <label for="filter-date">Filter by Date:</label>
+      <input type="date" id="filter-date">
+      <button class="btn btn-primary" onclick="fetchHistory()">Filter</button>
+      <input type="text" id="search-input" placeholder="Search by name or ID" onkeyup="searchHistory()">
+    </div>
+
+    <table class="table table-striped table-bordered">
+        <thead class="thead-dark">
+            <tr>
+                <th>ID Number</th>
+                <th>Name</th>
+                <th>Sit Purpose</th>
+                <th>Laboratory</th>
+                <th>Login Time</th>
+                <th>Logout Time</th>
+                <th>Date</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="history-body">
+            <!-- Records will be inserted here -->
+        </tbody>
+    </table>
+
+    <div class="pagination">
+      <button class="btn btn-secondary" onclick="prevPage()">Previous</button>
+      <span id="page-info"></span>
+      <button class="btn btn-secondary" onclick="nextPage()">Next</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    let currentPage = 1;
+    const recordsPerPage = 10;
+    let filteredData = [];
+
+    function fetchHistory() {
+        let dateFilter = document.getElementById('filter-date').value;
+        
+        $.get('/get_sit_in_history', function(data) {
+            filteredData = data;
+            if (dateFilter) {
+                filteredData = data.filter(record => record.date === dateFilter);
+            }
+            currentPage = 1;
+            displayRecords();
+        });
+    }
+
+    function searchHistory() {
+        let searchInput = document.getElementById('search-input').value.toLowerCase();
+        filteredData = filteredData.filter(record => 
+            record.name.toLowerCase().includes(searchInput) || 
+            record.id_number.toLowerCase().includes(searchInput)
+        );
+        currentPage = 1;
+        displayRecords();
+    }
+
+    function displayRecords() {
+        let historyBody = document.getElementById('history-body');
+        historyBody.innerHTML = '';
+
+        let start = (currentPage - 1) * recordsPerPage;
+        let end = start + recordsPerPage;
+        let paginatedData = filteredData.slice(start, end);
+
+        paginatedData.forEach(record => {
+            let row = `<tr>
+                <td>${record.id_number}</td>
+                <td>${record.name}</td>
+                <td>${record.sit_purpose}</td>
+                <td>${record.laboratory}</td>
+                <td>${record.login_time}</td>
+                <td>${record.logout_time || 'N/A'}</td>
+                <td>${record.date}</td>
+                <td>${record.action}</td>
+            </tr>`;
+            historyBody.innerHTML += row;
+        });
+
+        document.getElementById('page-info').innerText = `Page ${currentPage} of ${Math.ceil(filteredData.length / recordsPerPage)}`;
+    }
+
+    function prevPage() {
+        if (currentPage > 1) {
+            currentPage--;
+            displayRecords();
+        }
+    }
+
+    function nextPage() {
+        if (currentPage * recordsPerPage < filteredData.length) {
+            currentPage++;
+            displayRecords();
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", fetchHistory);
+</script>
+{% endblock %}

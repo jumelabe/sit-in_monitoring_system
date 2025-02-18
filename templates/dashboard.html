@@ -1,3 +1,8 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -21,6 +26,13 @@
             box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
             flex: 1; /* Allow each section to take equal space */
             max-width: 48%; /* Max width for each section */
+            overflow: hidden; /* Ensure content does not overflow */
+            height: 100%; /* Ensure the height is 100% of the container */
+        }
+
+        .rules-regulation {
+            max-height: 400px; /* Set a max height for the rules and regulation section */
+            overflow-y: auto; /* Add vertical scroll bar */
         }
     
         .student-info h2, .announcement h2, .rules-regulation h2 {
@@ -137,6 +149,7 @@
         .save-btn:hover {
             background: linear-gradient(135deg, #574bff, #3a267a);
         }
+
     
         /* Optional: Adjust for smaller screens */
         @media (max-width: 768px) {
@@ -160,9 +173,10 @@
     <div class="dashboard-container">
         <div class="sidebar">
             <h1 class="dashboard-title">Dashboard</h1>
-            <button class="menu-btn">Sit-In History</button>
+            <a href="{{ url_for('dashboard') }}" class="menu-btn active">Dashboard</a>
+            <a href="{{ url_for('sit_in_history') }}" class="menu-btn">Sit-In History</a>
             <button class="menu-btn">Reservation</button>
-            <li><a href="{{ url_for('logout') }}" class="logout-btn">Logout</a></li>
+            <a href="{{ url_for('logout') }}" class="menu-btn logout-btn">Logout</a>
         </div>
         
         <div class="content">
@@ -184,7 +198,7 @@
                 <div class="announcement">
                     <h2>Announcement</h2>
                     <div class="announcement-item">
-                        <p><strong>CCS Admin | 2025-Feb-03</strong></p>
+                        <p><strong>CCS Admin | 2025-Feb-14</strong></p>
                         <p>The College of Computer Studies will open the registration of students for the Sit-in privilege starting tomorrow.</p>
                     </div>
                     <div class="announcement-item">
@@ -196,11 +210,30 @@
                 <!-- Rules And Regulation Section -->
                 <div class="rules-regulation" style="width: 100%; max-width: 600px; margin-left: auto; margin-right: auto;">
                     <h2>Rules And Regulation</h2>
-                    <p>1. Follow the lab rules and regulations.</p>
-                    <p>2. Maintain silence in the lab.</p>
-                    <p>3. No food or drinks allowed inside the lab.</p>
-                    <p>4. Handle equipment with care.</p>
-                    <p>5. Report any issues to the lab supervisor.</p>
+                    <p>COLLEGE OF INFORMATION & COMPUTER STUDIES</p>
+                    <p>UNIVERSITY OF CEBU</p>
+                    <p>LABORATORY RULES AND REGULATIONS</p>
+                    <p>To avoid embarrassment and maintain camaraderie with your friends and superiors at our laboratories, please observe the following:</p>
+                    <p>1. Maintain silence, proper decorum, and discipline inside the laboratory. Mobile phones, walkmans and other personal pieces of equipment must be switched off.</p>
+                    <p>2. Games are not allowed inside the lab. This includes computer-related games, card games and other games that may disturb the operation of the lab.</p>
+                    <p>3. Surfing the Internet is allowed only with the permission of the instructor. Downloading and installing of software are strictly prohibited.</p>
+                    <p>4. Getting access to other websites not related to the course (especially pornographic and illicit sites) is strictly prohibited.</p>
+                    <p>5. Deleting computer files and changing the set-up of the computer is a major offense.</p>
+                    <p>6. Observe computer time usage carefully. A fifteen-minute allowance is given for each use. Otherwise, the unit will be given to those who wish to "sit-in".</p>
+                    <p>7. Observe proper decorum while inside the laboratory.</p>
+                    <p>a. Do not get inside the lab unless the instructor is present.</p> 
+                    <p>b. All bags, knapsacks, and the likes must be deposited at the counter.</p> 
+                    <p>c. Follow the seating arrangement of your instructor.</p> 
+                    <p>d. At the end of class, all software programs must be closed.</p> 
+                    <p>e. Return all chairs to their proper places after using.</p> 
+                    <p>8. Chewing gum, eating, drinking, smoking, and other forms of vandalism are prohibited inside the lab.</p>
+                    <p>9. Anyone causing a continual disturbance will be asked to leave the lab. Acts or gestures offensive to the members of the community, including public display of physical intimacy, are not tolerated.</p>
+                    <p>10. Persons exhibiting hostile or threatening behavior such as yelling, swearing, or disregarding requests made by lab personnel will be asked to leave the lab.</p>
+                    <p>11. For serious offense, the lab personnel may call the Civil Security Office (CSU) for assistance.</p>
+                    <p>12. Any technical problem or difficulty must be addressed to the laboratory supervisor, student assistant or instructor immediately.</p>
+                    <p>DISCIPLINARY ACTION</p>
+                        <p> • First Offense - The Head or the Dean or OIC recommends to the Guidance Center for a suspension from classes for each offender.</p>
+                        <p> • Second and Subsequent Offenses - A recommendation for a heavier sanction will be endorsed to the Guidance Center.</p>
                 </div>
             </div>
         </div>
@@ -242,7 +275,7 @@
     </div>
     
     <script>
-        setTimeout(function() {
+            setTimeout(function() {
             let alerts = document.querySelectorAll('.alert');
             alerts.forEach(alert => {
                 alert.style.transition = "opacity 0.5s";
@@ -261,3 +294,4 @@
     </script>
 </body>
 </html>
+{% endblock %}

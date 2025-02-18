@@ -1,6 +1,6 @@
 import sqlite3
 import os
-from flask import Flask, request, redirect, url_for, flash, render_template, session
+from flask import Flask, request, jsonify, redirect, url_for, flash, render_template, session
 from werkzeug.utils import secure_filename
 from PIL import Image
 
@@ -23,6 +23,10 @@ def resize_image(image_path, size=(150, 150)):
     with Image.open(image_path) as img:
         img = img.resize(size, Image.ANTIALIAS)
         img.save(image_path, quality=95)
+
+@app.route('/')
+def home():
+    return redirect(url_for('login'))
 
 @app.route('/edit_profile', methods=['POST'])
 def edit_profile():
@@ -78,8 +82,6 @@ def edit_profile():
         conn.close()
 
     return redirect(url_for('dashboard'))
-
-    
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -144,8 +146,7 @@ def register():
 
     return render_template('register.html')
 
-
-@app.route('/dashboard', methods=['GET', 'POST'])
+@app.route('/dashboard', methods=['GET'])
 def dashboard():
     if 'user_id' not in session:
         flash("Please log in first!", "warning")
@@ -180,30 +181,72 @@ def dashboard():
         "session_count": user["session_count"] if user["session_count"] else 0
     }
 
-    # If the form is submitted, update the user information
-    if request.method == 'POST':
-        new_course = request.form['course']
-        new_year_level = request.form['year_level']
-        new_email = request.form['email_address']
-        
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            UPDATE students
-            SET course = ?, year_level = ?, email_address = ?
-            WHERE idno = ?
-        """, (new_course, new_year_level, new_email, session['user_id']))
-        
-        conn.commit()
-        conn.close()
-
-        flash("Student information updated successfully!", "success")
-        return redirect(url_for('dashboard'))
-
     return render_template('dashboard.html', user=user_data)
 
+def migrate():
+    conn = sqlite3.connect("users.db")
+    cursor = conn.cursor()
+    
+    # Check if the table already exists
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS sit_in_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id_number TEXT NOT NULL,
+            name TEXT NOT NULL,
+            sit_purpose TEXT NOT NULL,
+            laboratory TEXT NOT NULL,
+            login_time TEXT NOT NULL,
+            logout_time TEXT,
+            date TEXT NOT NULL,
+            action TEXT NOT NULL
+        )
+    """)
+    
+    conn.commit()
+    conn.close()
+    print("Migration completed: sit_in_history table created (if not exists).")
 
+def insert_sit_in_record(id_number, name, sit_purpose, laboratory, login_time, date, action):
+    conn = sqlite3.connect("users.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO sit_in_history (id_number, name, sit_purpose, laboratory, login_time, date, action)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (id_number, name, sit_purpose, laboratory, login_time, date, action))
+    conn.commit()
+    conn.close()
+    print("Sit-in record inserted successfully.")
+
+@app.route('/log_sit_in', methods=['POST'])
+def log_sit_in():
+    data = request.json
+    insert_sit_in_record(data['id_number'], data['name'], data['sit_purpose'], data['laboratory'], data['login_time'], data['date'], data['action'])
+    return jsonify({"message": "Sit-in logged successfully"}), 201
+
+@app.route('/update_logout', methods=['POST'])
+def update_logout():
+    data = request.json
+    conn = sqlite3.connect("users.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE sit_in_history SET logout_time = ? WHERE id_number = ? AND logout_time IS NULL
+    """, (data['logout_time'], data['id_number']))
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Logout time updated successfully"})
+
+@app.route('/get_sit_in_history', methods=['GET'])
+def get_sit_in_history():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM sit_in_history")
+    records = cursor.fetchall()
+    conn.close()
+    return jsonify([dict(zip([column[0] for column in cursor.description], row)) for row in records])
+
+@app.route('/sit_in_history')
+def sit_in_history():
+    return render_template('sit_in_history.html')
 
 @app.route('/logout')
 def logout():
@@ -212,6 +255,7 @@ def logout():
     return redirect(url_for('login'))
 
 if __name__ == '__main__':
+    migrate()  # Ensure the database is set up
     app.run(debug=True)
 
 
