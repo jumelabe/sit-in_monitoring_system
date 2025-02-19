@@ -1,8 +1,9 @@
 import sqlite3
 import os
-from flask import Flask, request, jsonify, redirect, url_for, flash, render_template, session
+from flask import Flask, request, jsonify, redirect, url_for, flash, render_template, session, make_response
 from werkzeug.utils import secure_filename
 from PIL import Image
+from functools import wraps
 
 app = Flask(__name__)
 app.secret_key = 'kaon aron di ma brother'  # Secret key for session management
@@ -24,16 +25,29 @@ def resize_image(image_path, size=(150, 150)):
         img = img.resize(size, Image.LANCZOS)
         img.save(image_path, quality=95)
 
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash("Please log in first!", "warning")
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+@app.after_request
+def add_header(response):
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '-1'
+    return response
+
 @app.route('/')
 def home():
     return redirect(url_for('login'))
 
 @app.route('/edit_profile', methods=['POST'])
+@login_required
 def edit_profile():
-    if 'user_id' not in session:
-        flash("Please log in first!", "warning")
-        return redirect(url_for('login'))
-
     student_id = session['user_id']
     firstname = request.form.get('firstname')
     lastname = request.form.get('lastname')
@@ -103,7 +117,11 @@ def login():
             flash("Invalid credentials, please try again.", "danger")
             return redirect(url_for('login'))
 
-    return render_template('login.html')
+    response = make_response(render_template('login.html'))
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '-1'
+    return response
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -147,11 +165,8 @@ def register():
     return render_template('register.html')
 
 @app.route('/dashboard', methods=['GET'])
+@login_required
 def dashboard():
-    if 'user_id' not in session:
-        flash("Please log in first!", "warning")
-        return redirect(url_for('login'))
-
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -182,29 +197,6 @@ def dashboard():
     }
 
     return render_template('dashboard.html', user=user_data)
-
-def migrate():
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
-    
-    # Check if the table already exists
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS sit_in_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            id_number TEXT NOT NULL,
-            name TEXT NOT NULL,
-            sit_purpose TEXT NOT NULL,
-            laboratory TEXT NOT NULL,
-            login_time TEXT NOT NULL,
-            logout_time TEXT,
-            date TEXT NOT NULL,
-            action TEXT NOT NULL
-        )
-    """)
-    
-    conn.commit()
-    conn.close()
-    print("Migration completed: sit_in_history table created (if not exists).")
 
 def insert_sit_in_record(id_number, name, sit_purpose, laboratory, login_time, date, action):
     conn = sqlite3.connect("users.db")
@@ -245,17 +237,47 @@ def get_sit_in_history():
     return jsonify([dict(zip([column[0] for column in cursor.description], row)) for row in records])
 
 @app.route('/sit_in_history')
+@login_required
 def sit_in_history():
     return render_template('sit_in_history.html')
 
+@app.route('/reserve', methods=["GET", "POST"])
+@login_required
+def reserve():
+    if request.method == 'POST':
+        id_number = request.form['id_number']
+        student_name = request.form['student_name']
+        purpose = request.form['purpose']
+        lab = request.form['lab']
+        time_in = request.form['time_in']
+        date = request.form['date']
+        remaining_session = request.form['remaining_session']
+
+        conn = sqlite3.connect('users.db')
+        cursor = conn.cursor()
+        cursor.execute('INSERT INTO reservation (id_number, student_name, sit_purpose, laboratory, time_in, date, remaining_session) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                      (id_number, student_name, purpose, lab, time_in, date, remaining_session))
+        conn.commit()
+        conn.close()
+
+        flash("Reservation created successfully!", "success")
+        return redirect(url_for('reserve'))
+    
+    return render_template('reservation.html')
+
 @app.route('/logout')
 def logout():
-    session.pop('user_id', None)
+    session.clear()
     flash("You have been logged out.", "info")
-    return redirect(url_for('login'))
+    response = redirect(url_for('login'))
+
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '-1'
+    
+    return response
 
 if __name__ == '__main__':
-    migrate()  # Ensure the database is set up
     app.run(debug=True)
 
 

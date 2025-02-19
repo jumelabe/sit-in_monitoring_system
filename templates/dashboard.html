@@ -3,8 +3,6 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
-<!DOCTYPE html>
-<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -175,7 +173,7 @@
             <h1 class="dashboard-title">Dashboard</h1>
             <a href="{{ url_for('dashboard') }}" class="menu-btn active">Dashboard</a>
             <a href="{{ url_for('sit_in_history') }}" class="menu-btn">Sit-In History</a>
-            <button class="menu-btn">Reservation</button>
+            <a href="{{ url_for('reserve') }}" class="menu-btn">Reservation</a>
             <a href="{{ url_for('logout') }}" class="menu-btn logout-btn">Logout</a>
         </div>
         

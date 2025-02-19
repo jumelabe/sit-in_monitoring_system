@@ -5,10 +5,10 @@
 {% block content %}
 <div class="dashboard-container">
   <div class="sidebar">
-    <h1 class="dashboard-title">History Information</h1>
+    <h1 class="dashboard-title">History</h1>
     <a href="{{ url_for('dashboard') }}" class="menu-btn">Dashboard</a>
     <a href="{{ url_for('sit_in_history') }}" class="menu-btn active">Sit-In History</a>
-    <button class="menu-btn">Reservation</button>
+    <a href="{{ url_for('reserve') }}" class="menu-btn">Reservation</a>
     <a href="{{ url_for('logout') }}" class="menu-btn logout-btn">Logout</a>
   </div>
   

@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+
+{% block title %}Reservation{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="sidebar">
+        <h1 class="dashboard-title">Reservation</h1>
+        <a href="{{ url_for('dashboard') }}" class="menu-btn">Dashboard</a>
+        <a href="{{ url_for('sit_in_history') }}" class="menu-btn">Sit-In History</a>
+        <a href="{{ url_for('reserve') }}" class="menu-btn active">Reservation</a>
+        <a href="{{ url_for('logout') }}" class="menu-btn logout-btn">Logout</a>
+    </div>
+
+    <div class="content-container">
+        <div class="form-wrapper">
+            <h2 class="form-header">Reserve a Lab Session</h2>
+            {% if success_message %}
+            <div class="success-message">{{ success_message }}</div>
+            {% endif %}
+            <form action="/reserve" method="POST" class="reservation-form">
+                <label for="id_number">ID Number:</label>
+                <input type="text" id="id_number" name="id_number" value="{{ id_number }}" readonly>
+
+                <label for="student_name">Student Name:</label>
+                <input type="text" id="student_name" name="student_name" value="{{ student_name }}" readonly>
+
+                <label for="purpose">Purpose:</label>
+                <input type="text" id="purpose" name="purpose" required>
+
+                <label for="lab">Lab:</label>
+                <input type="text" id="lab" name="lab" required>
+
+                <label for="time_in">Time In:</label>
+                <input type="time" id="time_in" name="time_in" required>
+
+                <label for="date">Date:</label>
+                <input type="date" id="date" name="date" required>
+
+                <label for="remaining_session">Remaining Session:</label>
+                <input type="text" id="remaining_session" name="remaining_session" value="{{ remaining_session }}" readonly>
+
+                <button type="submit" class="btn btn-primary">Reserve Now</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
