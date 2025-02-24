@@ -40,7 +40,8 @@
                 <label for="remaining_session">Remaining Session:</label>
                 <input type="text" id="remaining_session" name="remaining_session" value="{{ remaining_session }}" readonly>
 
-                <button type="submit" class="btn btn-primary">Reserve Now</button>
+                <button type="submit" class="btn btn-primary" {% if remaining_session == 0 %}disabled{% endif %}>
+                    Reserve Now
             </form>
         </div>
     </div>

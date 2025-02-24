@@ -4,6 +4,7 @@ from flask import Flask, request, jsonify, redirect, url_for, flash, render_temp
 from werkzeug.utils import secure_filename
 from PIL import Image
 from functools import wraps
+from datetime import timedelta
 
 app = Flask(__name__)
 app.secret_key = 'kaon aron di ma brother'  # Secret key for session management
@@ -150,8 +151,8 @@ def register():
 
         try:
             cursor.execute(
-                'INSERT INTO students (idno, lastname, firstname, midname, course, year_level, email_address, username, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                (student_id, lastname, firstname, middlename, course, year_level, email, username, password)
+                'INSERT INTO students (idno, lastname, firstname, midname, course, year_level, email_address, username, password, session_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                (student_id, lastname, firstname, middlename, course, year_level, email, username, password, 30)  # Initialize session_count to 30 hours
             )
             conn.commit()
             flash("Registration successful! You can now log in.", "success")
@@ -183,6 +184,11 @@ def dashboard():
         flash("User not found!", "danger")
         return redirect(url_for('logout'))
 
+    # Update session data
+    session['firstname'] = user['firstname']
+    session['lastname'] = user['lastname']
+    session['session_count'] = user['session_count']
+
     # Convert user data into a dictionary for Jinja template
     user_data = {
         "idno": user["idno"],
@@ -205,6 +211,13 @@ def insert_sit_in_record(id_number, name, sit_purpose, laboratory, login_time, d
         INSERT INTO sit_in_history (id_number, name, sit_purpose, laboratory, login_time, date, action)
         VALUES (?, ?, ?, ?, ?, ?, ?)
     """, (id_number, name, sit_purpose, laboratory, login_time, date, action))
+    
+    # Update session count
+    cursor.execute("SELECT session_count FROM students WHERE idno = ?", (id_number,))
+    session_count = cursor.fetchone()[0]
+    new_session_count = min(session_count + 1, 30)  # Ensure it does not exceed 30 hours
+    cursor.execute("UPDATE students SET session_count = ? WHERE idno = ?", (new_session_count, id_number))
+    
     conn.commit()
     conn.close()
     print("Sit-in record inserted successfully.")
@@ -223,6 +236,13 @@ def update_logout():
     cursor.execute("""
         UPDATE sit_in_history SET logout_time = ? WHERE id_number = ? AND logout_time IS NULL
     """, (data['logout_time'], data['id_number']))
+    
+    # Update session count
+    cursor.execute("SELECT session_count FROM students WHERE idno = ?", (data['id_number'],))
+    session_count = cursor.fetchone()[0]
+    new_session_count = max(session_count - 1, 0)  # Ensure it does not go below 0
+    cursor.execute("UPDATE students SET session_count = ? WHERE idno = ?", (new_session_count, data['id_number']))
+    
     conn.commit()
     conn.close()
     return jsonify({"message": "Logout time updated successfully"})
@@ -244,26 +264,58 @@ def sit_in_history():
 @app.route('/reserve', methods=["GET", "POST"])
 @login_required
 def reserve():
-    if request.method == 'POST':
-        id_number = request.form['id_number']
-        student_name = request.form['student_name']
-        purpose = request.form['purpose']
-        lab = request.form['lab']
-        time_in = request.form['time_in']
-        date = request.form['date']
-        remaining_session = request.form['remaining_session']
+    user_id = session['user_id']  # Get the logged-in user ID
 
-        conn = sqlite3.connect('users.db')
+    with get_db_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute('INSERT INTO reservation (id_number, student_name, sit_purpose, laboratory, time_in, date, remaining_session) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                      (id_number, student_name, purpose, lab, time_in, date, remaining_session))
-        conn.commit()
-        conn.close()
 
-        flash("Reservation created successfully!", "success")
-        return redirect(url_for('reserve'))
-    
-    return render_template('reservation.html')
+        # 🔎 Fetch student details including session_count
+        cursor.execute("SELECT idno, firstname, lastname, session_count FROM students WHERE idno = ?", (user_id,))
+        user = cursor.fetchone()
+
+        if not user:
+            flash("User not found!", "danger")
+            return redirect(url_for('logout'))
+
+        remaining_session = user["session_count"]  # Sync remaining session with database
+
+        if request.method == 'POST':
+            purpose = request.form['purpose']
+            lab = request.form['lab']
+            time_in = request.form['time_in']
+            date = request.form['date']
+
+            # Prevent reservations if session count is zero
+            if remaining_session <= 0:
+                flash("You have no remaining session hours.", "danger")
+                return redirect(url_for('reserve'))
+
+            try:
+                # Insert reservation with correct session count
+                cursor.execute('INSERT INTO reservation (id_number, student_name, sit_purpose, laboratory, time_in, date, remaining_session) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                               (user["idno"], f"{user['firstname']} {user['lastname']}", purpose, lab, time_in, date, remaining_session))
+
+                # Update session count after reservation (reduce by 1)
+                new_session_count = max(remaining_session - 1, 0)  # Prevent negative values
+                cursor.execute("UPDATE students SET session_count = ? WHERE idno = ?", (new_session_count, user["idno"]))
+
+                conn.commit()
+
+                # Update session variable to reflect new session count
+                session['session_count'] = new_session_count
+
+                flash("Reservation created successfully!", "success")
+            except sqlite3.Error as e:
+                flash(f"Database error: {str(e)}", "danger")
+
+            return redirect(url_for('reserve'))
+
+    # Pass updated remaining session count to template
+    return render_template('reservation.html', 
+                           id_number=user["idno"],
+                           student_name=f"{user['firstname']} {user['lastname']}",
+                           remaining_session=session["session_count"])
+
 
 @app.route('/logout')
 def logout():
