@@ -51,6 +51,7 @@ def home():
 def edit_profile():
     student_id = session['user_id']
     firstname = request.form.get('firstname')
+    middlename = request.form.get('middlename')
     lastname = request.form.get('lastname')
     course = request.form.get('course')
     year_level = request.form.get('year_level')
@@ -73,19 +74,19 @@ def edit_profile():
     # Update query (without profile picture)
     update_query = """
         UPDATE students 
-        SET firstname = ?, lastname = ?, course = ?, year_level = ?, email_address = ?
+        SET firstname = ?, midname = ?, lastname = ?, course = ?, year_level = ?, email_address = ?
         WHERE idno = ?
     """
-    values = [firstname, lastname, course, year_level, email_address, student_id]
+    values = [firstname, middlename, lastname, course, year_level, email_address, student_id]
 
     # Update query (with profile picture)
     if profile_picture_url:
         update_query = """
             UPDATE students 
-            SET firstname = ?, lastname = ?, course = ?, year_level = ?, email_address = ?, profile_picture = ?
+            SET firstname = ?, midname = ?, lastname = ?, course = ?, year_level = ?, email_address = ?, profile_picture = ?
             WHERE idno = ?
         """
-        values = [firstname, lastname, course, year_level, email_address, profile_picture_url, student_id]
+        values = [firstname, middlename, lastname, course, year_level, email_address, profile_picture_url, student_id]
 
     try:
         cursor.execute(update_query, values)
@@ -187,6 +188,7 @@ def dashboard():
     # Update session data
     session['firstname'] = user['firstname']
     session['lastname'] = user['lastname']
+    session['midname'] = user['midname']
     session['session_count'] = user['session_count']
 
     # Convert user data into a dictionary for Jinja template
@@ -270,7 +272,7 @@ def reserve():
         cursor = conn.cursor()
 
         # 🔎 Fetch student details including session_count
-        cursor.execute("SELECT idno, firstname, lastname, session_count FROM students WHERE idno = ?", (user_id,))
+        cursor.execute("SELECT idno, firstname, midname, lastname, session_count FROM students WHERE idno = ?", (user_id,))
         user = cursor.fetchone()
 
         if not user:
@@ -293,7 +295,7 @@ def reserve():
             try:
                 # Insert reservation with correct session count
                 cursor.execute('INSERT INTO reservation (id_number, student_name, sit_purpose, laboratory, time_in, date, remaining_session) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                               (user["idno"], f"{user['firstname']} {user['lastname']}", purpose, lab, time_in, date, remaining_session))
+                               (user["idno"], f"{user['firstname']} {user['midname']} {user['lastname']}", purpose, lab, time_in, date, remaining_session))
 
                 # Update session count after reservation (reduce by 1)
                 new_session_count = max(remaining_session - 1, 0)  # Prevent negative values
@@ -313,7 +315,7 @@ def reserve():
     # Pass updated remaining session count to template
     return render_template('reservation.html', 
                            id_number=user["idno"],
-                           student_name=f"{user['firstname']} {user['lastname']}",
+                           student_name=f"{user['firstname']} {user['midname']} {user['lastname']}",
                            remaining_session=session["session_count"])
 
 
