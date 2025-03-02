@@ -4,7 +4,7 @@ from flask import Flask, request, jsonify, redirect, url_for, flash, render_temp
 from werkzeug.utils import secure_filename
 from PIL import Image
 from functools import wraps
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 app = Flask(__name__)
 app.secret_key = 'kaon aron di ma brother'  # Secret key for session management
@@ -51,7 +51,6 @@ def home():
 def edit_profile():
     student_id = session['user_id']
     firstname = request.form.get('firstname')
-    middlename = request.form.get('middlename')
     lastname = request.form.get('lastname')
     course = request.form.get('course')
     year_level = request.form.get('year_level')
@@ -74,19 +73,19 @@ def edit_profile():
     # Update query (without profile picture)
     update_query = """
         UPDATE students 
-        SET firstname = ?, midname = ?, lastname = ?, course = ?, year_level = ?, email_address = ?
+        SET firstname = ?, lastname = ?, course = ?, year_level = ?, email_address = ?
         WHERE idno = ?
     """
-    values = [firstname, middlename, lastname, course, year_level, email_address, student_id]
+    values = [firstname, lastname, course, year_level, email_address, student_id]
 
     # Update query (with profile picture)
     if profile_picture_url:
         update_query = """
             UPDATE students 
-            SET firstname = ?, midname = ?, lastname = ?, course = ?, year_level = ?, email_address = ?, profile_picture = ?
+            SET firstname = ?, lastname = ?, course = ?, year_level = ?, email_address = ?, profile_picture = ?
             WHERE idno = ?
         """
-        values = [firstname, middlename, lastname, course, year_level, email_address, profile_picture_url, student_id]
+        values = [firstname, lastname, course, year_level, email_address, profile_picture_url, student_id]
 
     try:
         cursor.execute(update_query, values)
@@ -188,7 +187,6 @@ def dashboard():
     # Update session data
     session['firstname'] = user['firstname']
     session['lastname'] = user['lastname']
-    session['midname'] = user['midname']
     session['session_count'] = user['session_count']
 
     # Convert user data into a dictionary for Jinja template
@@ -214,12 +212,6 @@ def insert_sit_in_record(id_number, name, sit_purpose, laboratory, login_time, d
         VALUES (?, ?, ?, ?, ?, ?, ?)
     """, (id_number, name, sit_purpose, laboratory, login_time, date, action))
     
-    # Update session count
-    cursor.execute("SELECT session_count FROM students WHERE idno = ?", (id_number,))
-    session_count = cursor.fetchone()[0]
-    new_session_count = min(session_count + 1, 30)  # Ensure it does not exceed 30 hours
-    cursor.execute("UPDATE students SET session_count = ? WHERE idno = ?", (new_session_count, id_number))
-    
     conn.commit()
     conn.close()
     print("Sit-in record inserted successfully.")
@@ -235,6 +227,18 @@ def update_logout():
     data = request.json
     conn = sqlite3.connect("users.db")
     cursor = conn.cursor()
+    
+    # Calculate the duration of the sit-in session
+    cursor.execute("""
+        SELECT login_time FROM sit_in_history WHERE id_number = ? AND logout_time IS NULL
+    """, (data['id_number'],))
+    login_time = cursor.fetchone()[0]
+    login_time = datetime.strptime(login_time, '%Y-%m-%d %H:%M:%S')
+    logout_time = datetime.strptime(data['logout_time'], '%Y-%m-%d %H:%M:%S')
+    duration = logout_time - login_time
+    minutes_used = duration.total_seconds() / 60
+    
+    # Update the logout time
     cursor.execute("""
         UPDATE sit_in_history SET logout_time = ? WHERE id_number = ? AND logout_time IS NULL
     """, (data['logout_time'], data['id_number']))
@@ -242,7 +246,7 @@ def update_logout():
     # Update session count
     cursor.execute("SELECT session_count FROM students WHERE idno = ?", (data['id_number'],))
     session_count = cursor.fetchone()[0]
-    new_session_count = max(session_count - 1, 0)  # Ensure it does not go below 0
+    new_session_count = max(session_count - minutes_used, 0)  # Ensure it does not go below 0
     cursor.execute("UPDATE students SET session_count = ? WHERE idno = ?", (new_session_count, data['id_number']))
     
     conn.commit()
@@ -271,8 +275,8 @@ def reserve():
     with get_db_connection() as conn:
         cursor = conn.cursor()
 
-        # 🔎 Fetch student details including session_count
-        cursor.execute("SELECT idno, firstname, midname, lastname, session_count FROM students WHERE idno = ?", (user_id,))
+        # Fetch student details including session_count
+        cursor.execute("SELECT idno, firstname, lastname, session_count FROM students WHERE idno = ?", (user_id,))
         user = cursor.fetchone()
 
         if not user:
@@ -293,18 +297,11 @@ def reserve():
                 return redirect(url_for('reserve'))
 
             try:
-                # Insert reservation with correct session count
-                cursor.execute('INSERT INTO reservation (id_number, student_name, sit_purpose, laboratory, time_in, date, remaining_session) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                               (user["idno"], f"{user['firstname']} {user['midname']} {user['lastname']}", purpose, lab, time_in, date, remaining_session))
-
-                # Update session count after reservation (reduce by 1)
-                new_session_count = max(remaining_session - 1, 0)  # Prevent negative values
-                cursor.execute("UPDATE students SET session_count = ? WHERE idno = ?", (new_session_count, user["idno"]))
+                # Insert reservation without deducting session count
+                cursor.execute('INSERT INTO reservations (id_number, student_name, sit_purpose, laboratory, time_in, date, remaining_sessions) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                               (user["idno"], f"{user['firstname']} {user['lastname']}", purpose, lab, time_in, date, remaining_session))
 
                 conn.commit()
-
-                # Update session variable to reflect new session count
-                session['session_count'] = new_session_count
 
                 flash("Reservation created successfully!", "success")
             except sqlite3.Error as e:
@@ -315,9 +312,24 @@ def reserve():
     # Pass updated remaining session count to template
     return render_template('reservation.html', 
                            id_number=user["idno"],
-                           student_name=f"{user['firstname']} {user['midname']} {user['lastname']}",
+                           student_name=f"{user['firstname']} {user['lastname']}",
                            remaining_session=session["session_count"])
 
+@app.route('/give_feedback', methods=['POST'])
+def give_feedback():
+    data = request.json
+    id_number = data['id_number']
+    feedback = data['feedback']
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE sit_in_history SET feedback = ? WHERE id_number = ? AND logout_time IS NOT NULL
+    """, (feedback, id_number))
+    conn.commit()
+    conn.close()
+    
+    return jsonify({"message": "Feedback submitted successfully"})
 
 @app.route('/logout')
 def logout():
