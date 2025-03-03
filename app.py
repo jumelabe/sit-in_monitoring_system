@@ -113,21 +113,12 @@ def login():
         user_id = request.form.get('user_id')
         password = request.form.get('password')
 
-        print(f"Attempting login with user_id: {user_id}")  # Debug print
-
         conn = get_db_connection()
         cursor = conn.cursor()
 
         # Check in students table
         cursor.execute("SELECT * FROM students WHERE idno = ?", (user_id,))
         user = cursor.fetchone()
-
-        if user:
-            print(f"Found user in students table: {user['idno']}")  # Debug print
-            print(f"Stored password: {user['password']}")  # Debug print
-            print(f"Entered password: {password}")  # Debug print
-        else:
-            print("User not found in students table")  # Debug print
 
         if user and user["password"] == password:  # Plain text password check
             session['user_id'] = str(user["idno"])  # Ensure session stores string
@@ -138,15 +129,6 @@ def login():
         # Check in admin table if not found in students
         cursor.execute("SELECT * FROM admin WHERE username = ?", (user_id,))
         admin = cursor.fetchone()
-
-        if admin:
-            print(f"Found user in admin table: {admin['username']}")  # Debug print
-            print(f"Stored password: {admin['password']}")  # Debug print
-            print(f"Entered password: {password}")  # Debug print
-        else:
-            print("User not found in admin table")  # Debug print
-
-        conn.close()
 
         if admin and admin["password"] == password:  # Plain text password check
             session['user_id'] = str(admin["id"])  # Ensure session stores string
