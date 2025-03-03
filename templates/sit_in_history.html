@@ -32,6 +32,7 @@
                 <th>Logout Time</th>
                 <th>Date</th>
                 <th>Action</th>
+                <th>Feedback</th>
             </tr>
         </thead>
         <tbody id="history-body">
@@ -94,6 +95,7 @@
                 <td>${record.logout_time || 'N/A'}</td>
                 <td>${record.date}</td>
                 <td>${record.action}</td>
+                <td>${record.feedback || 'N/A'}</td>
             </tr>`;
             historyBody.innerHTML += row;
         });
@@ -112,6 +114,16 @@
         if (currentPage * recordsPerPage < filteredData.length) {
             currentPage++;
             displayRecords();
+        }
+    }
+
+    function giveFeedback(idNumber) {
+        let feedback = prompt("Please enter your feedback:");
+        if (feedback) {
+            $.post('/give_feedback', { id_number: idNumber, feedback: feedback }, function(response) {
+                alert(response.message);
+                fetchHistory();
+            });
         }
     }
 
