@@ -35,6 +35,15 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session or session.get('role') != 'admin':
+            flash("Admin access required!", "danger")
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 @app.after_request
 def add_header(response):
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
@@ -102,22 +111,52 @@ def edit_profile():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        student_id = request.form.get('student_id')
+        user_id = request.form.get('user_id')
         password = request.form.get('password')
+
+        print(f"Attempting login with user_id: {user_id}")  # Debug print
 
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM students WHERE idno = ?", (student_id,))
+
+        # Check in students table
+        cursor.execute("SELECT * FROM students WHERE idno = ?", (user_id,))
         user = cursor.fetchone()
-        conn.close()
+
+        if user:
+            print(f"Found user in students table: {user['idno']}")  # Debug print
+            print(f"Stored password: {user['password']}")  # Debug print
+            print(f"Entered password: {password}")  # Debug print
+        else:
+            print("User not found in students table")  # Debug print
 
         if user and user["password"] == password:  # Plain text password check
             session['user_id'] = str(user["idno"])  # Ensure session stores string
+            session['role'] = 'student'  # Store user role in session
             flash("Login successful!", "success")
             return redirect(url_for('dashboard'))
+
+        # Check in admin table if not found in students
+        cursor.execute("SELECT * FROM admin WHERE username = ?", (user_id,))
+        admin = cursor.fetchone()
+
+        if admin:
+            print(f"Found user in admin table: {admin['username']}")  # Debug print
+            print(f"Stored password: {admin['password']}")  # Debug print
+            print(f"Entered password: {password}")  # Debug print
         else:
-            flash("Invalid credentials, please try again.", "danger")
-            return redirect(url_for('login'))
+            print("User not found in admin table")  # Debug print
+
+        conn.close()
+
+        if admin and admin["password"] == password:  # Plain text password check
+            session['user_id'] = str(admin["id"])  # Ensure session stores string
+            session['role'] = 'admin'  # Store user role in session
+            flash("Login successful!", "success")
+            return redirect(url_for('admin_dashboard'))
+
+        flash("Invalid credentials, please try again.", "danger")
+        return redirect(url_for('login'))
 
     response = make_response(render_template('login.html'))
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
@@ -318,6 +357,15 @@ def reserve():
                            student_name=f"{user['firstname']} {user['midname']} {user['lastname']}",
                            remaining_session=session["session_count"])
 
+@app.route('/admin/dashboard')
+@admin_required
+def admin_dashboard():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM students")
+    users = cursor.fetchall()
+    conn.close()
+    return render_template('admin_dashboard.html', users=users)
 
 @app.route('/logout')
 def logout():

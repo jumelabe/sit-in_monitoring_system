@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Admin Dashboard</h1>
+<table>
+    <thead>
+        <tr>
+            <th>ID Number</th>
+            <th>First Name</th>
+            <th>Middle Name</th>
+            <th>Last Name</th>
+            <th>Course</th>
+            <th>Year Level</th>
+            <th>Email Address</th>
+            <th>Profile Picture</th>
+            <th>Session Count</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for user in users %}
+        <tr>
+            <td>{{ user.idno }}</td>
+            <td>{{ user.firstname }}</td>
+            <td>{{ user.midname }}</td>
+            <td>{{ user.lastname }}</td>
+            <td>{{ user.course }}</td>
+            <td>{{ user.year_level }}</td>
+            <td>{{ user.email_address }}</td>
+            <td>
+                {% if user.profile_picture %}
+                <img src="{{ url_for('static', filename=user.profile_picture) }}" alt="Profile Picture" width="50">
+                {% else %}
+                N/A
+                {% endif %}
+            </td>
+            <td>{{ user.session_count }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
