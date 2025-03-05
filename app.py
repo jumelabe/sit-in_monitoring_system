@@ -342,9 +342,9 @@ def admin_dashboard():
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM students")
-    users = cursor.fetchall()
+    students = cursor.fetchall()
     conn.close()
-    return render_template('admin_dashboard.html', users=users)
+    return render_template('admin_dashboard.html', students=students)
 
 @app.route('/logout')
 def logout():
