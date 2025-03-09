@@ -199,6 +199,10 @@ def dashboard():
     """, (session['user_id'],))
     
     user = cursor.fetchone()
+
+    # Fetch announcements
+    cursor.execute("SELECT * FROM announcements ORDER BY created_at DESC")
+    announcements = cursor.fetchall()
     conn.close()
 
     if not user:
@@ -223,7 +227,7 @@ def dashboard():
         "session_count": user["session_count"] if user["session_count"] else 0
     }
 
-    return render_template('dashboard.html', user=user_data)
+    return render_template('dashboard.html', user=user_data, announcements=announcements)
 
 def insert_sit_in_record(id_number, name, sit_purpose, laboratory, login_time, date, action):
     conn = sqlite3.connect("users.db")
@@ -239,9 +243,41 @@ def insert_sit_in_record(id_number, name, sit_purpose, laboratory, login_time, d
 
 @app.route('/log_sit_in', methods=['POST'])
 def log_sit_in():
-    data = request.json
-    insert_sit_in_record(data['id_number'], data['name'], data['sit_purpose'], data['laboratory'], data['login_time'], data['date'], data['action'])
-    return jsonify({"message": "Sit-in logged successfully"}), 201
+    id_number = request.form.get('id_number')
+    name = request.form.get('name')
+    sit_purpose = request.form.get('sit_purpose')
+    laboratory = request.form.get('laboratory')
+    login_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    date = datetime.now().strftime('%Y-%m-%d')
+    action = 'login'
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Check if the student is already logged in
+    cursor.execute("""
+        SELECT * FROM sit_in_history 
+        WHERE id_number = ? AND logout_time IS NULL
+    """, (id_number,))
+    existing_sit_in = cursor.fetchone()
+
+    if existing_sit_in:
+        flash("Student is already logged in for a sit-in session.", "danger")
+        conn.close()
+        return redirect(url_for('admin_dashboard'))
+
+    insert_sit_in_record(id_number, name, sit_purpose, laboratory, login_time, date, action)
+
+    # Update the student's session count
+    cursor.execute("SELECT session_count FROM students WHERE idno = ?", (id_number,))
+    session_count = cursor.fetchone()[0]
+    new_session_count = max(session_count - 1, 0)  # Deduct 1 session
+    cursor.execute("UPDATE students SET session_count = ? WHERE idno = ?", (new_session_count, id_number))
+    conn.commit()
+    conn.close()
+
+    flash("Sit-in logged successfully!", "success")
+    return redirect(url_for('admin_dashboard'))
 
 @app.route('/update_logout', methods=['POST'])
 def update_logout():
@@ -345,6 +381,111 @@ def admin_dashboard():
     students = cursor.fetchall()
     conn.close()
     return render_template('admin_dashboard.html', students=students)
+
+@app.route('/get_student/<student_id>')
+def get_student(student_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT idno, firstname, midname, lastname, session_count FROM students WHERE idno = ?", (student_id,))
+    student = cursor.fetchone()
+    conn.close()
+
+    if student:
+        student_data = {
+            "success": True,
+            "idno": student["idno"],
+            "name": f"{student['firstname']} {student['midname']} {student['lastname']}",
+            "session_count": student["session_count"]
+        }
+        return jsonify(student_data)
+    else:
+        return jsonify({"success": False})
+
+@app.route('/current_sit_in')
+@admin_required
+def current_sit_in():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT s.idno, s.firstname, s.midname, s.lastname, s.course, s.year_level, s.email_address, s.profile_picture, s.session_count
+        FROM students s
+        JOIN sit_in_history h ON s.idno = h.id_number
+        WHERE h.logout_time IS NULL
+    """)
+    sit_ins = cursor.fetchall()
+    conn.close()
+    return render_template('current_sit_in.html', sit_ins=sit_ins)
+
+@app.route('/announcement', methods=['GET', 'POST'])
+@login_required
+def announcement():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    if request.method == 'POST':
+        title = request.form.get('title')
+        content = request.form.get('message')  # Ensure consistency with DB column
+        created_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        try:
+            cursor.execute(
+                'INSERT INTO announcements (title, content, created_at) VALUES (?, ?, ?)',
+                (title, content, created_at)
+            )
+            conn.commit()
+            flash("Announcement created successfully!", "success")
+        except sqlite3.Error as e:
+            flash(f"Database error: {str(e)}", "danger")
+        finally:
+            cursor.close()
+            conn.close()
+
+        return redirect(url_for('announcement'))
+
+    cursor.execute("SELECT id, title, content, created_at FROM announcements ORDER BY created_at DESC")
+    announcements = cursor.fetchall()
+    cursor.close()  # Fix: Close cursor before closing connection
+    conn.close()
+
+    return render_template('announcement.html', announcements=announcements)
+
+@app.route('/announcement/edit/<int:id>', methods=['POST'])
+@admin_required
+def edit_announcement(id):
+    title = request.form.get('title')
+    content = request.form.get('message')  # Ensure consistency with DB column
+
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                'UPDATE announcements SET title = ?, content = ? WHERE id = ?',
+                (title, content, id)
+            )
+            conn.commit()
+            flash("Announcement updated successfully!", "success")
+        except sqlite3.Error as e:
+            flash(f"Database error: {str(e)}", "danger")
+        finally:
+            cursor.close()
+
+    return redirect(url_for('announcement'))
+
+@app.route('/announcement/delete/<int:id>', methods=['POST'])
+@admin_required
+def delete_announcement(id):
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('DELETE FROM announcements WHERE id = ?', (id,))
+            conn.commit()
+            flash("Announcement deleted successfully!", "success")
+        except sqlite3.Error as e:
+            flash(f"Database error: {str(e)}", "danger")
+        finally:
+            cursor.close()
+
+    return redirect(url_for('announcement'))
 
 @app.route('/logout')
 def logout():
