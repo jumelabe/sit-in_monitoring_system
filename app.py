@@ -267,13 +267,6 @@ def log_sit_in():
         return redirect(url_for('admin_dashboard'))
 
     insert_sit_in_record(id_number, name, sit_purpose, laboratory, login_time, date, action)
-
-    # Update the student's session count
-    cursor.execute("SELECT session_count FROM students WHERE idno = ?", (id_number,))
-    session_count = cursor.fetchone()[0]
-    new_session_count = max(session_count - 1, 0)  # Deduct 1 session
-    cursor.execute("UPDATE students SET session_count = ? WHERE idno = ?", (new_session_count, id_number))
-    conn.commit()
     conn.close()
 
     flash("Sit-in logged successfully!", "success")
@@ -416,6 +409,38 @@ def current_sit_in():
     conn.close()
     return render_template('current_sit_in.html', sit_ins=sit_ins)
 
+@app.route('/end_session/<idno>', methods=['POST'])
+@admin_required
+def end_session(idno):
+    logout_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT login_time FROM sit_in_history WHERE id_number = ? AND logout_time IS NULL
+    """, (idno,))
+    login_time = cursor.fetchone()
+
+    if login_time:
+        # Update logout time
+        cursor.execute("""
+            UPDATE sit_in_history SET logout_time = ? WHERE id_number = ? AND logout_time IS NULL
+        """, (logout_time, idno))
+
+        # Get current session count and subtract 1
+        cursor.execute("SELECT session_count FROM students WHERE idno = ?", (idno,))
+        session_count = cursor.fetchone()[0]
+        new_session_count = max(session_count - 1, 0)  # Subtract 1 session, don't go below 0
+        
+        cursor.execute("UPDATE students SET session_count = ? WHERE idno = ?", (new_session_count, idno))
+
+        conn.commit()
+        conn.close()
+        return jsonify({"message": "Session ended successfully"}), 200
+    else:
+        conn.close()
+        return jsonify({"message": "No active session found for this student"}), 404
+
 @app.route('/announcement', methods=['GET', 'POST'])
 @login_required
 def announcement():
@@ -498,6 +523,7 @@ def logout():
     response.headers['Expires'] = '-1'
     
     return response
+
 
 if __name__ == '__main__':
     app.run(debug=True)
