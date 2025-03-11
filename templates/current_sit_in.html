@@ -15,30 +15,99 @@
             justify-content: space-between;
             gap: 20px;
             flex-wrap: wrap;
+            max-width: 1400px; /* Increased container width */
+            margin: 0 auto;
+            padding: 20px;
         }
     
         .sit-in-list {
             background: #fff;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
             flex: 1;
             width: 100%;
-            overflow: hidden;
+            overflow-x: auto;
         }
     
         .sit-in-list h2 {
-            font-size: 24px;
+            font-size: 28px;
             font-weight: bold;
-            margin-bottom: 15px;
+            margin-bottom: 25px;
             text-align: center;
+            color: #333;
         }
-    
-        .profile-pic {
-            width: 50px;
-            height: 50px;
-            object-fit: cover;
-            border-radius: 50%;
+
+        #sitInTable {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-top: 20px;
+            font-size: 15px;
+        }
+
+        #sitInTable th {
+            background-color: #2c3e50;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        #sitInTable td {
+            padding: 12px 15px;
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        #sitInTable tbody tr:hover {
+            background-color: #f5f6fa;
+            transition: background-color 0.3s ease;
+        }
+
+        .end-session-btn {
+            padding: 8px 16px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .end-session-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(220, 53, 69, 0.2);
+        }
+
+        #searchInput {
+            max-width: 400px;
+            margin: 0 auto 20px;
+            padding: 12px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+            display: block;
+        }
+
+        #searchInput:focus {
+            border-color: #2c3e50;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(44, 62, 80, 0.1);
+        }
+
+        /* Responsive table */
+        @media (max-width: 1200px) {
+            .container {
+                padding: 10px;
+            }
+            
+            #sitInTable {
+                font-size: 14px;
+            }
+            
+            #sitInTable th,
+            #sitInTable td {
+                padding: 10px;
+            }
         }
     </style>
 </head>
@@ -69,8 +138,8 @@
                                 <th>Last Name</th>
                                 <th>Course</th>
                                 <th>Year Level</th>
-                                <th>Email Address</th>
-                                <th>Profile Picture</th>
+                                <th>Purpose</th>
+                                <th>Lab</th>
                                 <th>Session Count</th>
                                 <th>Action</th>
                             </tr>
@@ -84,19 +153,12 @@
                                 <td>{{ sit_in.lastname }}</td>
                                 <td>{{ sit_in.course }}</td>
                                 <td>{{ sit_in.year_level }}</td>
-                                <td>{{ sit_in.email_address }}</td>
-                                <td>
-                                    {% if sit_in.profile_picture %}
-                                    <img src="{{ url_for('static', filename=sit_in.profile_picture) }}" alt="Profile Picture" class="profile-pic">
-                                    {% else %}
-                                    N/A
-                                    {% endif %}
-                                </td>
+                                <td>{{ sit_in.purpose }}</td>  <!-- Changed from sit_purpose to purpose -->
+                                <td>{{ sit_in.sit_lab }}</td>  <!-- Changed from laboratory to sit_lab -->
                                 <td>{{ sit_in.session_count }}</td>
                                 <td>
                                     <button class="btn btn-danger end-session-btn" data-id="{{ sit_in.idno }}">End Session</button>
                                 </td>
-                                
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -129,26 +191,36 @@
             }
         }
         
-        document.querySelectorAll('.end-session-btn').forEach(button => {
-            button.addEventListener('click', function () {
-                const idno = this.getAttribute('data-id');
-                
-                if (confirm("Are you sure you want to end this session?")) {
-                    fetch(`/end_session/${idno}`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        }
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        alert(data.message);
-                        location.reload();
-                    })
-                    .catch(error => console.error('Error:', error));
-                }
-            });
+            document.querySelectorAll('.end-session-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const idno = this.getAttribute('data-id');
+            const row = this.closest('tr');
+
+            if (confirm("Are you sure you want to end this session?")) {
+                fetch(`/end_session/${idno}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data); // Debugging
+                    if (data.message === "Session ended successfully") {
+                        row.remove(); // Remove from table
+                        alert("Session ended successfully");
+                    } else {
+                        alert(data.message || "Error ending session");
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while ending the session.');
+                });
+            }
         });
+    });
+
     </script>
 </body>
 </html>

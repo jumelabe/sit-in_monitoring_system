@@ -21,10 +21,29 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-def resize_image(image_path, size=(150, 150)):
+def resize_image(image_path, max_size=(300, 300)):
     with Image.open(image_path) as img:
-        img = img.resize(size, Image.LANCZOS)
-        img.save(image_path, quality=95)
+        # Convert to RGB if image is in RGBA mode
+        if img.mode == 'RGBA':
+            img = img.convert('RGB')
+            
+        # Calculate aspect ratio
+        aspect = img.width / img.height
+        
+        if img.width > max_size[0] or img.height > max_size[1]:
+            if aspect > 1:
+                # Width is greater than height
+                new_width = min(img.width, max_size[0])
+                new_height = int(new_width / aspect)
+            else:
+                # Height is greater than width
+                new_height = min(img.height, max_size[1])
+                new_width = int(new_height * aspect)
+                
+            img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            
+        # Save with high quality
+        img.save(image_path, 'JPEG', quality=95, optimize=True)
 
 def login_required(f):
     @wraps(f)
@@ -67,37 +86,58 @@ def edit_profile():
 
     # Handle Profile Picture Upload
     profile_picture = request.files.get('profile_picture')
-    profile_picture_url = None  # Default to None
+    profile_picture_url = None
 
     if profile_picture and profile_picture.filename != '':
-        filename = secure_filename(profile_picture.filename)
+        # Create a unique filename using timestamp
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"profile_{student_id}_{timestamp}_{secure_filename(profile_picture.filename)}"
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        profile_picture.save(file_path)
-        resize_image(file_path)  # Resize the image
-        profile_picture_url = f'static/uploads/{filename}'
+        
+        try:
+            # Save the original file with proper extension
+            file_extension = os.path.splitext(profile_picture.filename)[1].lower()
+            if file_extension not in ['.jpg', '.jpeg', '.png']:
+                raise ValueError("Invalid file format. Only JPG and PNG are allowed.")
+                
+            profile_picture.save(file_path)
+            # Resize the image with improved quality
+            resize_image(file_path)
+            # Set the relative path for database storage
+            profile_picture_url = os.path.join('uploads', filename).replace('\\', '/')
+        except Exception as e:
+            flash(f"Error saving profile picture: {str(e)}", "danger")
+            return redirect(url_for('dashboard'))
 
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Update query (without profile picture)
-    update_query = """
-        UPDATE students 
-        SET firstname = ?, lastname = ?, course = ?, year_level = ?, email_address = ?
-        WHERE idno = ?
-    """
-    values = [firstname, lastname, course, year_level, email_address, student_id]
-
-    # Update query (with profile picture)
-    if profile_picture_url:
-        update_query = """
-            UPDATE students 
-            SET firstname = ?, lastname = ?, course = ?, year_level = ?, email_address = ?, profile_picture = ?
-            WHERE idno = ?
-        """
-        values = [firstname, lastname, course, year_level, email_address, profile_picture_url, student_id]
-
     try:
-        cursor.execute(update_query, values)
+        if profile_picture_url:
+            # Get current profile picture
+            cursor.execute("SELECT profile_picture FROM students WHERE idno = ?", (student_id,))
+            old_picture = cursor.fetchone()['profile_picture']
+
+            # Delete old profile picture if it exists
+            if old_picture:
+                old_picture_path = os.path.join('static', old_picture)
+                if os.path.exists(old_picture_path):
+                    os.remove(old_picture_path)
+
+            cursor.execute("""
+                UPDATE students 
+                SET firstname = ?, lastname = ?, course = ?, year_level = ?, 
+                    email_address = ?, profile_picture = ?
+                WHERE idno = ?
+            """, (firstname, lastname, course, year_level, email_address, profile_picture_url, student_id))
+        else:
+            cursor.execute("""
+                UPDATE students 
+                SET firstname = ?, lastname = ?, course = ?, year_level = ?, 
+                    email_address = ?
+                WHERE idno = ?
+            """, (firstname, lastname, course, year_level, email_address, student_id))
+
         conn.commit()
         flash("Profile updated successfully!", "success")
     except sqlite3.Error as e:
@@ -230,53 +270,87 @@ def dashboard():
     return render_template('dashboard.html', user=user_data, announcements=announcements)
 
 def insert_sit_in_record(id_number, name, sit_purpose, laboratory, login_time, date, action):
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO sit_in_history (id_number, name, sit_purpose, laboratory, login_time, date, action)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (id_number, name, sit_purpose, laboratory, login_time, date, action))
-    
-    conn.commit()
-    conn.close()
-    print("Sit-in record inserted successfully.")
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Insert into sit_in_history
+            cursor.execute("""
+                INSERT INTO sit_in_history (id_number, name, sit_purpose, laboratory, login_time, date, action)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (id_number, name, sit_purpose, laboratory, login_time, date, action))
+            
+            # Get the student's session count
+            cursor.execute("SELECT session_count FROM students WHERE idno = ?", (id_number,))
+            session_count = cursor.fetchone()["session_count"]
+            
+            # Insert into current_sit_in
+            cursor.execute("""
+                INSERT INTO current_sit_in (id_number, name, purpose, sit_lab, session, status)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (id_number, name, sit_purpose, laboratory, session_count, 'Active'))
+            
+            conn.commit()
+    except sqlite3.Error as e:
+        print(f"Database error: {e}")
+        raise
 
-@app.route('/log_sit_in', methods=['POST'])
-def log_sit_in():
+@app.route('/sit_in', methods=['POST'])
+def sit_in():
     id_number = request.form.get('id_number')
     name = request.form.get('name')
     sit_purpose = request.form.get('sit_purpose')
     laboratory = request.form.get('laboratory')
-    login_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    date = datetime.now().strftime('%Y-%m-%d')
-    action = 'login'
 
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
 
-    # Check if the student is already logged in
-    cursor.execute("""
-        SELECT * FROM sit_in_history 
-        WHERE id_number = ? AND logout_time IS NULL
-    """, (id_number,))
-    existing_sit_in = cursor.fetchone()
+            # Check if the student is already in current_sit_in with Active status
+            cursor.execute("""
+                SELECT * FROM current_sit_in 
+                WHERE id_number = ? AND status = 'Active'
+            """, (id_number,))
+            existing_sit_in = cursor.fetchone()
 
-    if existing_sit_in:
-        flash("Student is already logged in for a sit-in session.", "danger")
-        conn.close()
+            if existing_sit_in:
+                flash("Student is already logged in for a sit-in session.", "danger")
+                return redirect(url_for('admin_dashboard'))
+
+            # Check if student has remaining session time
+            cursor.execute("SELECT session_count FROM students WHERE idno = ?", (id_number,))
+            session_count = cursor.fetchone()["session_count"]
+            
+            if session_count <= 0:
+                flash("Student has no remaining session time.", "danger")
+                return redirect(url_for('admin_dashboard'))
+
+            # Insert only into current_sit_in
+            cursor.execute("""
+                INSERT INTO current_sit_in (id_number, name, purpose, sit_lab, session, status)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (id_number, name, sit_purpose, laboratory, session_count, 'Active'))
+
+            conn.commit()
+            flash("Sit-in logged successfully!", "success")
+            return redirect(url_for('admin_dashboard'))
+        
+    except sqlite3.Error as e:
+        flash(f"Database error: {str(e)}", "danger")
         return redirect(url_for('admin_dashboard'))
-
-    insert_sit_in_record(id_number, name, sit_purpose, laboratory, login_time, date, action)
-    conn.close()
-
-    flash("Sit-in logged successfully!", "success")
-    return redirect(url_for('admin_dashboard'))
 
 @app.route('/update_logout', methods=['POST'])
 def update_logout():
     data = request.json
-    conn = sqlite3.connect("users.db")
+    conn = get_db_connection()
     cursor = conn.cursor()
+    
+    # Update status in current_sit_in
+    cursor.execute("""
+        UPDATE current_sit_in 
+        SET status = 'Completed' 
+        WHERE id_number = ? AND status = 'Active'
+    """, (data['id_number'],))
     
     # Calculate the duration of the sit-in session
     cursor.execute("""
@@ -315,7 +389,22 @@ def get_sit_in_history():
 @app.route('/sit_in_history')
 @login_required
 def sit_in_history():
-    return render_template('sit_in_history.html')
+    user_id = session['user_id']
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Fetch sit-in history for the current user
+    cursor.execute("""
+        SELECT date, sit_purpose, laboratory, login_time, logout_time
+        FROM sit_in_history
+        WHERE id_number = ?
+        ORDER BY date DESC, login_time DESC
+    """, (user_id,))
+    
+    history = cursor.fetchall()
+    conn.close()
+    
+    return render_template('sit_in_history.html', history=history)
 
 @app.route('/reserve', methods=["GET", "POST"])
 @login_required
@@ -400,46 +489,78 @@ def current_sit_in():
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT s.idno, s.firstname, s.midname, s.lastname, s.course, s.year_level, s.email_address, s.profile_picture, s.session_count
+        SELECT s.idno, s.firstname, s.midname, s.lastname, s.course, s.year_level, 
+               s.session_count, c.purpose, c.sit_lab, c.status
         FROM students s
-        JOIN sit_in_history h ON s.idno = h.id_number
-        WHERE h.logout_time IS NULL
+        INNER JOIN current_sit_in c ON s.idno = c.id_number
+        WHERE c.status = 'Active'
+        ORDER BY c.sit_id_number DESC
     """)
     sit_ins = cursor.fetchall()
     conn.close()
+    # Add debug print to check what's being returned
+    print("Current sit-ins:", [dict(sit_in) for sit_in in sit_ins])
     return render_template('current_sit_in.html', sit_ins=sit_ins)
 
 @app.route('/end_session/<idno>', methods=['POST'])
 @admin_required
 def end_session(idno):
-    logout_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
 
-    cursor.execute("""
-        SELECT login_time FROM sit_in_history WHERE id_number = ? AND logout_time IS NULL
-    """, (idno,))
-    login_time = cursor.fetchone()
+            # Check if the student has an active sit-in session
+            cursor.execute("""
+                SELECT id_number, name, purpose, sit_lab FROM current_sit_in 
+                WHERE id_number = ? AND status = 'Active'
+            """, (idno,))
+            current_session = cursor.fetchone()
 
-    if login_time:
-        # Update logout time
-        cursor.execute("""
-            UPDATE sit_in_history SET logout_time = ? WHERE id_number = ? AND logout_time IS NULL
-        """, (logout_time, idno))
+            if current_session:
+                # Instead of deleting, update status to 'Completed'
+                cursor.execute("""
+                    UPDATE current_sit_in 
+                    SET status = 'Completed'
+                    WHERE id_number = ? AND status = 'Active'
+                """, (idno,))
 
-        # Get current session count and subtract 1
-        cursor.execute("SELECT session_count FROM students WHERE idno = ?", (idno,))
-        session_count = cursor.fetchone()[0]
-        new_session_count = max(session_count - 1, 0)  # Subtract 1 session, don't go below 0
-        
-        cursor.execute("UPDATE students SET session_count = ? WHERE idno = ?", (new_session_count, idno))
+                # Get the current timestamp
+                current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                current_date = datetime.now().strftime('%Y-%m-%d')
 
-        conn.commit()
-        conn.close()
-        return jsonify({"message": "Session ended successfully"}), 200
-    else:
-        conn.close()
-        return jsonify({"message": "No active session found for this student"}), 404
+                # Record in sit_in_history
+                cursor.execute("""
+                INSERT INTO sit_in_history 
+                (id_number, name, sit_purpose, laboratory, login_time, logout_time, date, action)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                idno,
+                current_session['name'],
+                current_session['purpose'],
+                current_session['sit_lab'],
+                current_time,  # Login time
+                current_time,  # Logout time
+                current_date,
+                "Ended Session"
+            ))
+
+                # Deduct session count
+                cursor.execute("""
+                    UPDATE students SET session_count = MAX(session_count - 1, 0) WHERE idno = ?
+                """, (idno,))
+
+                conn.commit()
+                return jsonify({"message": "Session ended successfully"}), 200
+            else:
+                return jsonify({"message": "No active session found"}), 404
+
+    except sqlite3.Error as e:
+        print(f"Database error: {e}")
+        return jsonify({"message": f"Database error: {str(e)}"}), 500
+    except Exception as e:
+        print(f"Error: {e}")
+        return jsonify({"message": "An error occurred"}), 500
+
 
 @app.route('/announcement', methods=['GET', 'POST'])
 @login_required
