@@ -459,10 +459,24 @@ def reserve():
 def admin_dashboard():
     conn = get_db_connection()
     cursor = conn.cursor()
+    
+    # Fetch students data
     cursor.execute("SELECT * FROM students")
     students = cursor.fetchall()
+    
+    # Fetch statistics
+    cursor.execute("SELECT COUNT(*) FROM students")
+    student_registered = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM current_sit_in WHERE status = 'Active'")
+    current_sit_in = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM current_sit_in")
+    total_sit_in = cursor.fetchone()[0]
+    
     conn.close()
-    return render_template('admin_dashboard.html', students=students)
+    
+    return render_template('admin_dashboard.html', students=students, student_registered=student_registered, current_sit_in=current_sit_in, total_sit_in=total_sit_in)
 
 @app.route('/get_student/<student_id>')
 def get_student(student_id):
@@ -645,6 +659,23 @@ def logout():
     
     return response
 
+@app.route('/sit_in_purposes')
+@admin_required
+def sit_in_purposes():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT sit_purpose, COUNT(*) as count
+        FROM sit_in_history
+        GROUP BY sit_purpose
+    """)
+    results = cursor.fetchall()
+    conn.close()
+
+    labels = [row['sit_purpose'] for row in results]
+    counts = [row['count'] for row in results]
+
+    return jsonify({"labels": labels, "counts": counts})
 
 if __name__ == '__main__':
     app.run(debug=True)
