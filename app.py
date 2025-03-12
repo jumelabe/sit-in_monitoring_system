@@ -454,16 +454,27 @@ def reserve():
                            student_name=f"{user['firstname']} {user['lastname']}",
                            remaining_session=session["session_count"])
 
-@app.route('/admin/dashboard')
+@app.route('/admin/dashboard', methods=['GET', 'POST'])
 @admin_required
 def admin_dashboard():
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Fetch students data
-    cursor.execute("SELECT * FROM students")
-    students = cursor.fetchall()
-    
+    if request.method == 'POST':
+        title = request.form.get('title')
+        content = request.form.get('content')
+        created_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        try:
+            cursor.execute(
+                'INSERT INTO announcements (title, content, created_at) VALUES (?, ?, ?)',
+                (title, content, created_at)
+            )
+            conn.commit()
+            flash("Announcement created successfully!", "success")
+        except sqlite3.Error as e:
+            flash(f"Database error: {str(e)}", "danger")
+
     # Fetch statistics
     cursor.execute("SELECT COUNT(*) FROM students")
     student_registered = cursor.fetchone()[0]
@@ -473,10 +484,28 @@ def admin_dashboard():
     
     cursor.execute("SELECT COUNT(*) FROM current_sit_in")
     total_sit_in = cursor.fetchone()[0]
+
+    # Fetch announcements
+    cursor.execute("SELECT id, title, content, created_at FROM announcements ORDER BY created_at DESC")
+    announcements = cursor.fetchall()
     
     conn.close()
     
-    return render_template('admin_dashboard.html', students=students, student_registered=student_registered, current_sit_in=current_sit_in, total_sit_in=total_sit_in)
+    return render_template('admin_dashboard.html', student_registered=student_registered, current_sit_in=current_sit_in, total_sit_in=total_sit_in, announcements=announcements)
+
+@app.route('/student_list')
+@admin_required
+def student_list():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Fetch students data
+    cursor.execute("SELECT * FROM students")
+    students = cursor.fetchall()
+    
+    conn.close()
+    
+    return render_template('student_list.html', students=students)
 
 @app.route('/get_student/<student_id>')
 def get_student(student_id):
@@ -575,45 +604,11 @@ def end_session(idno):
         print(f"Error: {e}")
         return jsonify({"message": "An error occurred"}), 500
 
-
-@app.route('/announcement', methods=['GET', 'POST'])
-@login_required
-def announcement():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    if request.method == 'POST':
-        title = request.form.get('title')
-        content = request.form.get('message')  # Ensure consistency with DB column
-        created_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
-        try:
-            cursor.execute(
-                'INSERT INTO announcements (title, content, created_at) VALUES (?, ?, ?)',
-                (title, content, created_at)
-            )
-            conn.commit()
-            flash("Announcement created successfully!", "success")
-        except sqlite3.Error as e:
-            flash(f"Database error: {str(e)}", "danger")
-        finally:
-            cursor.close()
-            conn.close()
-
-        return redirect(url_for('announcement'))
-
-    cursor.execute("SELECT id, title, content, created_at FROM announcements ORDER BY created_at DESC")
-    announcements = cursor.fetchall()
-    cursor.close()  # Fix: Close cursor before closing connection
-    conn.close()
-
-    return render_template('announcement.html', announcements=announcements)
-
 @app.route('/announcement/edit/<int:id>', methods=['POST'])
 @admin_required
 def edit_announcement(id):
     title = request.form.get('title')
-    content = request.form.get('message')  # Ensure consistency with DB column
+    content = request.form.get('content')
 
     with get_db_connection() as conn:
         cursor = conn.cursor()
@@ -629,7 +624,7 @@ def edit_announcement(id):
         finally:
             cursor.close()
 
-    return redirect(url_for('announcement'))
+    return redirect(url_for('admin_dashboard'))
 
 @app.route('/announcement/delete/<int:id>', methods=['POST'])
 @admin_required
@@ -645,7 +640,7 @@ def delete_announcement(id):
         finally:
             cursor.close()
 
-    return redirect(url_for('announcement'))
+    return redirect(url_for('admin_dashboard'))
 
 @app.route('/logout')
 def logout():
