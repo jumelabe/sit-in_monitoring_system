@@ -12,6 +12,10 @@ app.secret_key = 'kaon aron di ma brother'  # Secret key for session management
 UPLOAD_FOLDER = 'static/uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+# Update Flask configuration
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=5)
+app.config['SESSION_REFRESH_EACH_REQUEST'] = True
+
 # Ensure the upload directory exists
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
@@ -48,8 +52,9 @@ def resize_image(image_path, max_size=(300, 300)):
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'user_id' not in session:
+        if not session.get('user_id'):
             flash("Please log in first!", "warning")
+            session.clear()  # Clear any invalid session data
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
@@ -57,8 +62,18 @@ def login_required(f):
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'user_id' not in session or session.get('role') != 'admin':
+        if not session.get('user_id') or session.get('user_type') != 'admin':
+            session.clear()  # Clear any invalid session data
             flash("Admin access required!", "danger")
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def student_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session or 'user_type' not in session or session.get('user_type') != 'student':
+            flash("Student access required!", "danger")
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
@@ -72,7 +87,12 @@ def add_header(response):
 
 @app.route('/')
 def home():
-    return redirect(url_for('login'))
+    if not session.get('user_id'):
+        return redirect(url_for('login'))
+    
+    if session.get('user_type') == 'admin':
+        return redirect(url_for('admin_dashboard'))
+    return redirect(url_for('dashboard'))
 
 @app.route('/edit_profile', methods=['POST'])
 @login_required
@@ -149,41 +169,54 @@ def edit_profile():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    # Clear any existing session
+    if session.get('user_id'):
+        session.clear()
+
     if request.method == 'POST':
         user_id = request.form.get('user_id')
         password = request.form.get('password')
 
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
 
-        # Check in students table
-        cursor.execute("SELECT * FROM students WHERE idno = ?", (user_id,))
-        user = cursor.fetchone()
+            # Check admin first
+            cursor.execute("SELECT * FROM admin WHERE username = ? AND password = ?", (user_id, password))
+            admin = cursor.fetchone()
 
-        if user and user["password"] == password:  # Plain text password check
-            session['user_id'] = str(user["idno"])  # Ensure session stores string
-            session['role'] = 'student'  # Store user role in session
-            flash("Login successful!", "success")
-            return redirect(url_for('dashboard'))
+            if admin:
+                session.permanent = True  # Enable session expiry
+                session['user_id'] = str(admin["id"])
+                session['user_type'] = 'admin'
+                session['username'] = admin["username"]
+                flash("Admin login successful!", "success")
+                return redirect(url_for('admin_dashboard'))
 
-        # Check in admin table if not found in students
-        cursor.execute("SELECT * FROM admin WHERE username = ?", (user_id,))
-        admin = cursor.fetchone()
+            # Then check students
+            cursor.execute("SELECT * FROM students WHERE idno = ? AND password = ?", (user_id, password))
+            student = cursor.fetchone()
 
-        if admin and admin["password"] == password:  # Plain text password check
-            session['user_id'] = str(admin["id"])  # Ensure session stores string
-            session['role'] = 'admin'  # Store user role in session
-            flash("Login successful!", "success")
-            return redirect(url_for('admin_dashboard'))
+            if student:
+                session.permanent = True  # Enable session expiry
+                session['user_id'] = str(student["idno"])
+                session['user_type'] = 'student'
+                session['firstname'] = student["firstname"]
+                session['lastname'] = student["lastname"]
+                session['session_count'] = student["session_count"]
+                flash("Login successful!", "success")
+                return redirect(url_for('dashboard'))
 
-        flash("Invalid credentials, please try again.", "danger")
-        return redirect(url_for('login'))
+            flash("Invalid credentials!", "danger")
+            return redirect(url_for('login'))
 
-    response = make_response(render_template('login.html'))
-    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '-1'
-    return response
+        except sqlite3.Error as e:
+            flash(f"Database error: {str(e)}", "danger")
+            return redirect(url_for('login'))
+        finally:
+            conn.close()
+
+    return render_template('login.html')
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -229,6 +262,10 @@ def register():
 @app.route('/dashboard', methods=['GET'])
 @login_required
 def dashboard():
+    if session.get('user_type') != 'student':
+        session.clear()
+        return redirect(url_for('login'))
+    
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -454,9 +491,14 @@ def reserve():
                            student_name=f"{user['firstname']} {user['lastname']}",
                            remaining_session=session["session_count"])
 
-@app.route('/admin/dashboard', methods=['GET', 'POST'])
+@app.route('/admin_dashboard', methods=['GET', 'POST'])
+@login_required
 @admin_required
 def admin_dashboard():
+    if session.get('user_type') != 'admin':
+        session.clear()
+        return redirect(url_for('login'))
+    
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -646,13 +688,7 @@ def delete_announcement(id):
 def logout():
     session.clear()
     flash("You have been logged out.", "info")
-    response = redirect(url_for('login'))
-
-    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '-1'
-    
-    return response
+    return redirect(url_for('login'))
 
 @app.route('/sit_in_purposes')
 @admin_required
@@ -672,7 +708,11 @@ def sit_in_purposes():
 
     return jsonify({"labels": labels, "counts": counts})
 
+@app.errorhandler(Exception)
+def handle_error(error):
+    session.clear()
+    flash("An error occurred. Please log in again.", "danger")
+    return redirect(url_for('login'))
+
 if __name__ == '__main__':
     app.run(debug=True)
-
-
