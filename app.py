@@ -13,8 +13,12 @@ UPLOAD_FOLDER = 'static/uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # Update Flask configuration
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=5)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=1)  # Increase session lifetime
 app.config['SESSION_REFRESH_EACH_REQUEST'] = True
+app.config['SESSION_COOKIE_SECURE'] = False  # Allow non-HTTPS
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_TYPE'] = 'filesystem'
 
 # Ensure the upload directory exists
 if not os.path.exists(UPLOAD_FOLDER):
@@ -62,10 +66,9 @@ def login_required(f):
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not session.get('user_id') or session.get('user_type') != 'admin':
-            session.clear()  # Clear any invalid session data
-            flash("Admin access required!", "danger")
+        if not all(session.get(key) for key in ['user_id', 'user_type', 'is_admin']):
             return redirect(url_for('login'))
+        session.modified = True
         return f(*args, **kwargs)
     return decorated_function
 
@@ -84,6 +87,20 @@ def add_header(response):
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '-1'
     return response
+
+@app.before_request
+def validate_session():
+    if request.endpoint and 'static' in request.endpoint:
+        return  # Skip session validation for static files
+        
+    if 'user_id' in session:
+        session.permanent = True
+        session.modified = True
+        
+        # Keep admin session alive
+        if session.get('user_type') == 'admin':
+            session['is_admin'] = True
+            session['last_activity'] = datetime.now().isoformat()
 
 @app.route('/')
 def home():
@@ -190,6 +207,8 @@ def login():
                 session['user_id'] = str(admin["id"])
                 session['user_type'] = 'admin'
                 session['username'] = admin["username"]
+                session['is_admin'] = True  # Add explicit admin flag
+                session.modified = True  # Ensure session is saved
                 flash("Admin login successful!", "success")
                 return redirect(url_for('admin_dashboard'))
 
@@ -495,9 +514,10 @@ def reserve():
 @login_required
 @admin_required
 def admin_dashboard():
-    if session.get('user_type') != 'admin':
-        session.clear()
-        return redirect(url_for('login'))
+    session.modified = True  # Ensure session is refreshed
+    
+    if not session.get('is_admin'):
+        session['is_admin'] = True
     
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -710,8 +730,11 @@ def sit_in_purposes():
 
 @app.errorhandler(Exception)
 def handle_error(error):
-    session.clear()
-    flash("An error occurred. Please log in again.", "danger")
+    if not request.path.startswith('/static/'):
+        print(f"Error occurred: {str(error)}")  # Add logging
+        if 'user_id' in session:
+            session.modified = True  # Try to preserve session
+            return redirect(url_for('admin_dashboard' if session.get('is_admin') else 'dashboard'))
     return redirect(url_for('login'))
 
 if __name__ == '__main__':
