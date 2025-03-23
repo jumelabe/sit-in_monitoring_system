@@ -77,21 +77,34 @@
             box-shadow: 0 4px 8px rgba(220, 53, 69, 0.2);
         }
 
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .search-container {
+            margin-bottom: 0;
+            display: flex;
+            gap: 10px;
+        }
+
         #searchInput {
-            max-width: 400px;
-            margin: 0 auto 20px;
-            padding: 12px 20px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 16px;
-            transition: border-color 0.3s ease;
-            display: block;
+            width: 250px;
+            padding: 8px 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            max-width: none;
+            margin: 0;
         }
 
         #searchInput:focus {
-            border-color: #2c3e50;
             outline: none;
-            box-shadow: 0 0 0 3px rgba(44, 62, 80, 0.1);
+            border-color: #2c3e50;
+            box-shadow: 0 0 5px rgba(44, 62, 80, 0.2);
         }
 
         /* Responsive table */
@@ -116,8 +129,10 @@
         <div class="sidebar">
             <h1 class="dashboard-title">Current Sit-in</h1>
             <a href="{{ url_for('admin_dashboard') }}" class="menu-btn">Dashboard</a>
-            <a href="{{ url_for('current_sit_in') }}" class="menu-btn active">Current Sit-in</a>
             <a href="{{ url_for('student_list') }}" class="menu-btn">Student List</a>
+            <a href="{{ url_for('current_sit_in') }}" class="menu-btn active">Current Sit-in</a>
+            <a href="{{ url_for('sit_in_records') }}" class="menu-btn">Sit-in Records</a>
+            <a href="{{ url_for('reports') }}" class="menu-btn">Reports</a>
             <a href="{{ url_for('logout') }}" class="menu-btn logout-btn">Logout</a>
         </div>
         
@@ -125,9 +140,12 @@
             <div class="container">
                 <!-- Sit-in List Section -->
                 <div class="sit-in-list">
-                    <h2>Current Sit-In</h2>
-                    <!-- Search functionality -->
-                    <input type="text" id="searchInput" onkeyup="searchSitIns()" placeholder="Search for sit-ins.." class="form-control mb-3">
+                    <div class="header-container">
+                        <h2>Current Sit-In</h2>
+                        <div class="search-container">
+                            <input type="text" id="searchInput" onkeyup="searchSitIns()" placeholder="Search for sit-ins.." class="form-control mb-3">
+                        </div>
+                    </div>
                     <!-- Sit-in list table -->
                     <table class="table table-bordered table-hover" id="sitInTable">
                         <thead class="thead-dark">

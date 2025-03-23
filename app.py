@@ -1,10 +1,23 @@
 import sqlite3
 import os
-from flask import Flask, request, jsonify, redirect, url_for, flash, render_template, session, make_response
+from flask import Flask, request, jsonify, redirect, url_for, flash, render_template, session, make_response, Response
 from werkzeug.utils import secure_filename
 from PIL import Image
 from functools import wraps
 from datetime import timedelta, datetime
+import csv
+import io
+from openpyxl import Workbook
+from io import BytesIO
+import pandas as pd
+from flask import send_file
+import platform
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+from openpyxl.utils import get_column_letter
 
 app = Flask(__name__)
 app.secret_key = 'kaon aron di ma brother'  # Secret key for session management
@@ -357,12 +370,14 @@ def sit_in():
     name = request.form.get('name')
     sit_purpose = request.form.get('sit_purpose')
     laboratory = request.form.get('laboratory')
+    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    current_date = datetime.now().strftime('%Y-%m-%d')
 
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-
-            # Check if the student is already in current_sit_in with Active status
+            
+            # Check existing active session
             cursor.execute("""
                 SELECT * FROM current_sit_in 
                 WHERE id_number = ? AND status = 'Active'
@@ -373,7 +388,7 @@ def sit_in():
                 flash("Student is already logged in for a sit-in session.", "danger")
                 return redirect(url_for('admin_dashboard'))
 
-            # Check if student has remaining session time
+            # Check session count
             cursor.execute("SELECT session_count FROM students WHERE idno = ?", (id_number,))
             session_count = cursor.fetchone()["session_count"]
             
@@ -381,11 +396,17 @@ def sit_in():
                 flash("Student has no remaining session time.", "danger")
                 return redirect(url_for('admin_dashboard'))
 
-            # Insert only into current_sit_in
+            # Insert into current_sit_in
             cursor.execute("""
                 INSERT INTO current_sit_in (id_number, name, purpose, sit_lab, session, status)
                 VALUES (?, ?, ?, ?, ?, ?)
             """, (id_number, name, sit_purpose, laboratory, session_count, 'Active'))
+
+            # Insert initial record into sit_in_records without logout_time
+            cursor.execute("""
+                INSERT INTO sit_in_records (id_number, name, purpose, lab, login_time, date)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (id_number, name, sit_purpose, laboratory, current_time, current_date))
 
             conn.commit()
             flash("Sit-in logged successfully!", "success")
@@ -401,37 +422,57 @@ def update_logout():
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Update status in current_sit_in
-    cursor.execute("""
-        UPDATE current_sit_in 
-        SET status = 'Completed' 
-        WHERE id_number = ? AND status = 'Active'
-    """, (data['id_number'],))
-    
-    # Calculate the duration of the sit-in session
-    cursor.execute("""
-        SELECT login_time FROM sit_in_history WHERE id_number = ? AND logout_time IS NULL
-    """, (data['id_number'],))
-    login_time = cursor.fetchone()[0]
-    login_time = datetime.strptime(login_time, '%Y-%m-%d %H:%M:%S')
-    logout_time = datetime.strptime(data['logout_time'], '%Y-%m-%d %H:%M:%S')
-    duration = logout_time - login_time
-    minutes_used = duration.total_seconds() / 60
-    
-    # Update the logout time
-    cursor.execute("""
-        UPDATE sit_in_history SET logout_time = ? WHERE id_number = ? AND logout_time IS NULL
-    """, (data['logout_time'], data['id_number']))
-    
-    # Update session count
-    cursor.execute("SELECT session_count FROM students WHERE idno = ?", (data['id_number'],))
-    session_count = cursor.fetchone()[0]
-    new_session_count = max(session_count - minutes_used, 0)  # Ensure it does not go below 0
-    cursor.execute("UPDATE students SET session_count = ? WHERE idno = ?", (new_session_count, data['id_number']))
-    
-    conn.commit()
-    conn.close()
-    return jsonify({"message": "Logout time updated successfully"})
+    try:
+        # Get current sit-in details before updating status
+        cursor.execute("""
+            SELECT name, purpose, sit_lab FROM current_sit_in 
+            WHERE id_number = ? AND status = 'Active'
+        """, (data['id_number'],))
+        current_session = cursor.fetchone()
+
+        if current_session:
+            # Update status in current_sit_in
+            cursor.execute("""
+                UPDATE current_sit_in 
+                SET status = 'Completed' 
+                WHERE id_number = ? AND status = 'Active'
+            """, (data['id_number'],))
+            
+            # Get the current time for logging
+            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            current_date = datetime.now().strftime('%Y-%m-%d')
+            
+            # Insert into sit_in_records
+            cursor.execute("""
+                INSERT INTO sit_in_records 
+                (id_number, name, purpose, lab, login_time, logout_time, date)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                data['id_number'],
+                current_session['name'],
+                current_session['purpose'],
+                current_session['sit_lab'],
+                current_time,  # Using current time as login_time
+                data['logout_time'],
+                current_date
+            ))
+            
+            # Update session count
+            cursor.execute("SELECT session_count FROM students WHERE idno = ?", (data['id_number'],))
+            session_count = cursor.fetchone()[0]
+            new_session_count = max(session_count - 1, 0)  # Deduct 1 hour or prevent going below 0
+            cursor.execute("UPDATE students SET session_count = ? WHERE idno = ?", (new_session_count, data['id_number']))
+            
+            conn.commit()
+            return jsonify({"message": "Logout successful and record created"}), 200
+        else:
+            return jsonify({"message": "No active session found"}), 404
+            
+    except sqlite3.Error as e:
+        print(f"Database error: {e}")
+        return jsonify({"message": f"Database error: {str(e)}"}), 500
+    finally:
+        conn.close()
 
 @app.route('/get_sit_in_history', methods=['GET'])
 def get_sit_in_history():
@@ -553,7 +594,7 @@ def admin_dashboard():
     
     conn.close()
     
-    return render_template('admin_dashboard.html', student_registered=student_registered, current_sit_in=current_sit_in, total_sit_in=total_sit_in, announcements=announcements)
+    return render_template('admin/admin_dashboard.html', student_registered=student_registered, current_sit_in=current_sit_in, total_sit_in=total_sit_in, announcements=announcements)
 
 @app.route('/student_list')
 @admin_required
@@ -567,7 +608,7 @@ def student_list():
     
     conn.close()
     
-    return render_template('student_list.html', students=students)
+    return render_template('admin/student_list.html', students=students)
 
 @app.route('/get_student/<student_id>')
 def get_student(student_id):
@@ -605,7 +646,7 @@ def current_sit_in():
     conn.close()
     # Add debug print to check what's being returned
     print("Current sit-ins:", [dict(sit_in) for sit_in in sit_ins])
-    return render_template('current_sit_in.html', sit_ins=sit_ins)
+    return render_template('admin/current_sit_in.html', sit_ins=sit_ins)
 
 @app.route('/end_session/<idno>', methods=['POST'])
 @admin_required
@@ -613,6 +654,7 @@ def end_session(idno):
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
+            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
             # Check if the student has an active sit-in session
             cursor.execute("""
@@ -622,36 +664,24 @@ def end_session(idno):
             current_session = cursor.fetchone()
 
             if current_session:
-                # Instead of deleting, update status to 'Completed'
+                # Update status in current_sit_in
                 cursor.execute("""
                     UPDATE current_sit_in 
-                    SET status = 'Completed'
+                    SET status = 'Completed' 
                     WHERE id_number = ? AND status = 'Active'
                 """, (idno,))
 
-                # Get the current timestamp
-                current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                current_date = datetime.now().strftime('%Y-%m-%d')
-
-                # Record in sit_in_history
+                # Update logout_time in sit_in_records
                 cursor.execute("""
-                INSERT INTO sit_in_history 
-                (id_number, name, sit_purpose, laboratory, login_time, logout_time, date, action)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                idno,
-                current_session['name'],
-                current_session['purpose'],
-                current_session['sit_lab'],
-                current_time,  # Login time
-                current_time,  # Logout time
-                current_date,
-                "Ended Session"
-            ))
+                    UPDATE sit_in_records 
+                    SET logout_time = ?
+                    WHERE id_number = ? AND logout_time IS NULL
+                """, (current_time, idno))
 
                 # Deduct session count
                 cursor.execute("""
-                    UPDATE students SET session_count = MAX(session_count - 1, 0) WHERE idno = ?
+                    UPDATE students SET session_count = MAX(session_count - 1, 0) 
+                    WHERE idno = ?
                 """, (idno,))
 
                 conn.commit()
@@ -728,13 +758,362 @@ def sit_in_purposes():
 
     return jsonify({"labels": labels, "counts": counts})
 
+@app.route('/sit_in_records')
+@admin_required
+def sit_in_records():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Fetch all records with proper ordering
+        cursor.execute("""
+            SELECT id_number, name, purpose, lab, 
+                   strftime('%Y-%m-%d %H:%M:%S', login_time) as login_time,
+                   strftime('%Y-%m-%d %H:%M:%S', logout_time) as logout_time,
+                   strftime('%Y-%m-%d', date) as date
+            FROM sit_in_records
+            ORDER BY date DESC, login_time DESC
+        """)
+        records = cursor.fetchall()
+        conn.close()
+        
+        return render_template('admin/sit_in_records.html', records=records)
+        
+    except sqlite3.Error as e:
+        flash(f"Database error: {str(e)}", "danger")
+        return redirect(url_for('admin_dashboard'))
+
+@app.route('/reports')
+@admin_required
+def reports():
+    try:
+        start_date = request.args.get('start_date', (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d'))
+        end_date = request.args.get('end_date', datetime.now().strftime('%Y-%m-%d'))
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Calculate statistics with NULL handling
+        cursor.execute("""
+            SELECT 
+                COUNT(*) as total_records,
+                COUNT(DISTINCT id_number) as unique_students,
+                COALESCE(
+                    (
+                        SELECT lab
+                        FROM sit_in_records
+                        GROUP BY lab
+                        ORDER BY COUNT(*) DESC
+                        LIMIT 1
+                    ),
+                    'N/A'
+                ) as most_active_lab,
+                COALESCE(
+                    AVG(
+                        CASE 
+                            WHEN login_time IS NOT NULL AND logout_time IS NOT NULL
+                            THEN ROUND((julianday(logout_time) - julianday(login_time)) * 24, 1)
+                            ELSE NULL
+                        END
+                    ),
+                    0
+                ) as avg_duration
+            FROM sit_in_records
+            WHERE date BETWEEN ? AND ?
+        """, (start_date, end_date))
+        
+        stats = cursor.fetchone()
+        
+        # Fetch reports data with duration calculation
+        cursor.execute("""
+            SELECT 
+                id_number,
+                name,
+                purpose,
+                lab, 
+                login_time,
+                logout_time,
+                date,
+                CASE 
+                    WHEN login_time IS NOT NULL AND logout_time IS NOT NULL
+                    THEN ROUND((julianday(logout_time) - julianday(login_time)) * 24, 1)
+                    ELSE 0
+                END as duration
+            FROM sit_in_records
+            WHERE date BETWEEN ? AND ?
+            ORDER BY date DESC, login_time DESC
+        """, (start_date, end_date))
+        
+        reports = cursor.fetchall()
+        
+        # Get unique labs and purposes for filters
+        cursor.execute("SELECT DISTINCT lab FROM sit_in_records WHERE lab IS NOT NULL ORDER BY lab")
+        labs = [row['lab'] for row in cursor.fetchall()]
+        
+        cursor.execute("SELECT DISTINCT purpose FROM sit_in_records WHERE purpose IS NOT NULL ORDER BY purpose")
+        purposes = [row['purpose'] for row in cursor.fetchall()]
+        
+        # Format stats with safe handling of None values
+        formatted_stats = {
+            'total_records': stats['total_records'] or 0,
+            'unique_students': stats['unique_students'] or 0,
+            'most_active_lab': stats['most_active_lab'] or 'N/A',
+            'avg_duration': f"{stats['avg_duration']:.1f}h" if stats['avg_duration'] is not None else '0.0h'
+        }
+        
+        conn.close()
+        
+        return render_template('admin/reports.html', 
+                             reports=reports,
+                             start_date=start_date, 
+                             end_date=end_date,
+                             total_records=formatted_stats['total_records'],
+                             unique_students=formatted_stats['unique_students'],
+                             most_active_lab=formatted_stats['most_active_lab'],
+                             avg_duration=formatted_stats['avg_duration'],
+                             labs=labs,
+                             purposes=purposes)
+                             
+    except Exception as e:
+        print(f"Error fetching reports: {str(e)}")  # Add debug print
+        flash(f"Error fetching reports: {str(e)}", "danger")
+        return redirect(url_for('admin_dashboard'))
+
+@app.route('/export_reports/<format>')
+@admin_required
+def export_reports(format):
+    try:
+        start_date = request.args.get('start_date', '')
+        end_date = request.args.get('end_date', '')
+        
+        # Input validation
+        if start_date and end_date:
+            try:
+                datetime.strptime(start_date, '%Y-%m-%d')
+                datetime.strptime(end_date, '%Y-%m-%d')
+            except ValueError:
+                return jsonify({'error': 'Invalid date format'}), 400
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        try:
+            query = """
+                SELECT id_number, name, purpose, lab,
+                       strftime('%Y-%m-%d %H:%M:%S', login_time) as login_time,
+                       strftime('%Y-%m-%d %H:%M:%S', logout_time) as logout_time,
+                       strftime('%Y-%m-%d', date) as date,
+                       CASE 
+                           WHEN login_time IS NOT NULL AND logout_time IS NOT NULL
+                           THEN ROUND((julianday(logout_time) - julianday(login_time)) * 24, 1)
+                           ELSE NULL 
+                       END as duration
+                FROM sit_in_records
+            """
+            
+            params = []
+            if start_date and end_date:
+                query += " WHERE date BETWEEN ? AND ?"
+                params = [start_date, end_date]
+            
+            query += " ORDER BY date DESC, login_time DESC"
+            cursor.execute(query, params)
+            reports = cursor.fetchall()
+            
+            if not reports:
+                return jsonify({'error': 'No data available for the selected period'}), 404
+
+            if format == 'csv':
+                return export_to_csv(reports)
+            elif format == 'excel':
+                return export_to_excel(reports, start_date, end_date)
+            elif format == 'pdf':
+                return export_to_pdf(reports, start_date, end_date)
+            else:
+                return jsonify({'error': 'Invalid export format'}), 400
+
+        except sqlite3.Error as e:
+            return jsonify({'error': f'Database error: {str(e)}'}), 500
+        finally:
+            conn.close()
+
+    except Exception as e:
+        print(f"Export error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+def export_to_csv(reports):
+    try:
+        si = io.StringIO()
+        writer = csv.writer(si)
+        
+        # Write headers
+        writer.writerow(['ID Number', 'Name', 'Purpose', 'Laboratory', 
+                        'Login Time', 'Logout Time', 'Date', 'Duration (hours)'])
+        
+        # Write data
+        for report in reports:
+            writer.writerow([
+                report['id_number'],
+                report['name'],
+                report['purpose'],
+                report['lab'],
+                report['login_time'] or '',
+                report['logout_time'] or '',
+                report['date'] or '',
+                f"{report['duration']:.1f}" if report['duration'] else ''
+            ])
+        
+        output = make_response(si.getvalue())
+        output.headers["Content-Disposition"] = f"attachment; filename=sit_in_reports_{datetime.now().strftime('%Y%m%d')}.csv"
+        output.headers["Content-type"] = "text/csv; charset=utf-8"
+        return output
+    except Exception as e:
+        raise Exception(f"CSV export error: {str(e)}")
+
+def export_to_excel(reports, start_date=None, end_date=None):
+    try:
+        output = BytesIO()
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Sit-in Reports"
+
+        # Add title and metadata
+        ws.merge_cells('A1:H1')
+        title_cell = ws['A1']
+        title_cell.value = "Sit-in Reports"
+        title_cell.font = Font(bold=True, size=14)
+        title_cell.alignment = Alignment(horizontal='center')
+
+        # Add date range if provided
+        current_row = 2
+        if start_date and end_date:
+            ws.merge_cells('A2:H2')
+            ws['A2'].value = f"Period: {start_date} to {end_date}"
+            ws['A2'].alignment = Alignment(horizontal='center')
+            current_row = 3
+
+        # Headers
+        headers = ['ID Number', 'Name', 'Purpose', 'Laboratory', 
+                  'Login Time', 'Logout Time', 'Date', 'Duration (hours)']
+        
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=current_row, column=col)
+            cell.value = header
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
+
+        # Data
+        for row_idx, report in enumerate(reports, current_row + 1):
+            ws.cell(row=row_idx, column=1).value = report['id_number']
+            ws.cell(row=row_idx, column=2).value = report['name']
+            ws.cell(row=row_idx, column=3).value = report['purpose']
+            ws.cell(row=row_idx, column=4).value = report['lab']
+            ws.cell(row=row_idx, column=5).value = report['login_time']
+            ws.cell(row=row_idx, column=6).value = report['logout_time']
+            ws.cell(row=row_idx, column=7).value = report['date']
+            ws.cell(row=row_idx, column=8).value = f"{report['duration']:.1f}" if report['duration'] else ''
+
+        # Auto-adjust column widths
+        for column in ws.columns:
+            max_length = 0
+            column = [cell for cell in column]
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = (max_length + 2)
+            ws.column_dimensions[column[0].column_letter].width = adjusted_width
+
+        wb.save(output)
+        output.seek(0)
+        
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=f'sit_in_reports_{datetime.now().strftime("%Y%m%d")}.xlsx'
+        )
+    except Exception as e:
+        raise Exception(f"Excel export error: {str(e)}")
+
+def export_to_pdf(reports, start_date=None, end_date=None):
+    try:
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=letter,
+            rightMargin=30,
+            leftMargin=30,
+            topMargin=30,
+            bottomMargin=18
+        )
+        
+        elements = []
+        styles = getSampleStyleSheet()
+
+        # Title
+        elements.append(Paragraph("Sit-in Reports", styles['Title']))
+        elements.append(Spacer(1, 12))
+
+        # Date range and generation time
+        if start_date and end_date:
+            elements.append(Paragraph(f"Period: {start_date} to {end_date}", styles['Normal']))
+        elements.append(Paragraph(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
+        elements.append(Spacer(1, 12))
+
+        # Table data
+        data = [['ID Number', 'Name', 'Purpose', 'Laboratory', 
+                 'Login Time', 'Logout Time', 'Date', 'Duration (hrs)']]
+                 
+        for report in reports:
+            data.append([
+                str(report['id_number']),
+                str(report['name']),
+                str(report['purpose']),
+                str(report['lab']),
+                str(report['login_time'] or ''),
+                str(report['logout_time'] or ''),
+                str(report['date'] or ''),
+                f"{report['duration']:.1f}" if report['duration'] else ''
+            ])
+
+        # Create and style the table
+        table = Table(data)
+        table.setStyle(TableStyle([
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,0), 10),
+            ('BOTTOMPADDING', (0,0), (-1,0), 12),
+            ('BACKGROUND', (0,0), (-1,0), colors.grey),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
+            ('FONTSIZE', (0,1), (-1,-1), 8),
+            ('GRID', (0,0), (-1,-1), 1, colors.black),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ]))
+
+        elements.append(table)
+        doc.build(elements)
+        buffer.seek(0)
+        
+        return send_file(
+            buffer,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=f'sit_in_reports_{datetime.now().strftime("%Y%m%d")}.pdf'
+        )
+    except Exception as e:
+        raise Exception(f"PDF export error: {str(e)}")
+
 @app.errorhandler(Exception)
 def handle_error(error):
-    if not request.path.startswith('/static/'):
-        print(f"Error occurred: {str(error)}")  # Add logging
-        if 'user_id' in session:
-            session.modified = True  # Try to preserve session
-            return redirect(url_for('admin_dashboard' if session.get('is_admin') else 'dashboard'))
+    print(f"Error occurred: {str(error)}")  # Add logging
+    if 'user_id' in session:
+        session.modified = True  # Try to preserve session
+        return redirect(url_for('admin_dashboard' if session.get('is_admin') else 'dashboard'))
     return redirect(url_for('login'))
 
 if __name__ == '__main__':

@@ -599,8 +599,10 @@
         <div class="sidebar">
             <h1 class="dashboard-title">Admin Dashboard</h1>
             <a href="{{ url_for('admin_dashboard') }}" class="menu-btn active">Dashboard</a>
-            <a href="{{ url_for('current_sit_in') }}" class="menu-btn">Current Sit-in</a>
             <a href="{{ url_for('student_list') }}" class="menu-btn">Student List</a>
+            <a href="{{ url_for('current_sit_in') }}" class="menu-btn">Current Sit-in</a>
+            <a href="{{ url_for('sit_in_records') }}" class="menu-btn">Sit-in Records</a>
+            <a href="{{ url_for('reports') }}" class="menu-btn">Reports</a>
             <a href="{{ url_for('logout') }}" class="menu-btn logout-btn">Logout</a>
         </div>
         <div class="content">

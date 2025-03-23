@@ -303,6 +303,36 @@
         .chart-container canvas {
             max-height: 400px;
         }
+
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .search-container {
+            margin-bottom: 0;
+            display: flex;
+            gap: 10px;
+        }
+
+        #searchInput {
+            width: 250px;
+            padding: 8px 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            max-width: none;
+            margin: 0;
+        }
+
+        #searchInput:focus {
+            outline: none;
+            border-color: #2c3e50;
+            box-shadow: 0 0 5px rgba(44, 62, 80, 0.2);
+        }
     </style>
 </head>
 <body>
@@ -310,17 +340,21 @@
         <div class="sidebar">
             <h1 class="dashboard-title">Student List</h1>
             <a href="{{ url_for('admin_dashboard') }}" class="menu-btn">Dashboard</a>
-            <a href="{{ url_for('current_sit_in') }}" class="menu-btn">Current Sit-in</a>
             <a href="{{ url_for('student_list') }}" class="menu-btn active">Student List</a>
+            <a href="{{ url_for('current_sit_in') }}" class="menu-btn">Current Sit-in</a>
+            <a href="{{ url_for('sit_in_records') }}" class="menu-btn">Sit-in Records</a>
+            <a href="{{ url_for('reports') }}" class="menu-btn">Reports</a>
             <a href="{{ url_for('logout') }}" class="menu-btn logout-btn">Logout</a>
         </div>
         <div class="content">
             <div class="container">
                 <div class="student-list">
-                    <h2>List of Students</h2>
-                    <div class="input-group mb-3">
-                        <input type="text" id="searchInput" placeholder="Enter Student ID..." class="form-control" onkeydown="handleSearch(event)">
-                        <button class="btn btn-primary" type="button" onclick="searchStudents()">Search</button>
+                    <div class="header-container">
+                        <h2>List of Students</h2>
+                        <div class="search-container">
+                            <input type="text" id="searchInput" placeholder="Enter Student ID..." onkeydown="handleSearch(event)">
+                            <button class="btn btn-primary" type="button" onclick="searchStudents()">Search</button>
+                        </div>
                     </div>
                     <table class="table table-bordered table-hover" id="studentTable">
                         <thead class="thead-dark">

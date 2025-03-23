@@ -1,0 +1,1092 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Reports{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+<link href="https://cdn.datatables.net/buttons/2.2.2/css/buttons.bootstrap5.min.css" rel="stylesheet">
+<link href="https://cdn.datatables.net/responsive/2.2.9/css/responsive.bootstrap5.min.css" rel="stylesheet">
+<style>
+    .btn-export {
+        margin-right: 10px;
+    }
+    .export-section {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+    }
+    .filter-section {
+        background: #ffffff;
+        padding: 20px;
+        border-radius: 5px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    /* Adjust main content margin */
+    .container-fluid {
+        margin-left: 250px;
+        width: calc(100% - 250px);
+        padding: 20px 30px;
+        position: relative;
+        min-height: 100vh;
+    }
+    .stats-card {
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 15px;
+        min-height: 130px;
+        height: auto;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    .stats-number {
+        font-size: 22px;
+        font-weight: bold;
+        color: #0d6efd;
+        margin: 8px 0;
+        line-height: 1;
+    }
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.8);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+    }
+    .date-error {
+        color: #dc3545;
+        font-size: 0.875rem;
+        margin-top: 0.25rem;
+    }
+    .stats-card h6 {
+        color: #495057;
+        font-size: 14px;
+        font-weight: 600;
+        margin: 0;
+        line-height: 1.2;
+    }
+    .stats-card small {
+        color: #6c757d;
+        font-size: 12px;
+        line-height: 1.2;
+    }
+    .mt-4 {
+        margin-top: 2rem !important;
+        font-size: 2rem;
+        color: #333;
+        position: relative;
+        z-index: 1;
+    }
+    /* Responsive styles */
+    @media (max-width: 991px) {
+        .container-fluid {
+            margin-left: 0;
+            width: 100%;
+            padding: 70px 15px 15px 15px; /* Added top padding for mobile */
+        }
+        .sidebar {
+            display: none;
+        }
+        .stats-card {
+            margin-bottom: 15px;
+            min-height: 140px;
+        }
+        .mt-4 {
+            font-size: 1.5rem;
+            margin-top: 1rem !important;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .btn-export {
+            margin-bottom: 10px;
+            width: 100%;
+        }
+        .export-section .d-flex {
+            flex-direction: column;
+        }
+        .stats-number {
+            font-size: 18px;
+        }
+        .filter-section {
+            padding: 15px;
+        }
+        .table-responsive {
+            overflow-x: auto;
+        }
+        .stats-card {
+            min-height: 110px;
+        }
+        .stats-card h6 {
+            font-size: 13px;
+        }
+        .stats-card small {
+            font-size: 11px;
+        }
+    }
+
+    @media (max-width: 576px) {
+        h1 {
+            font-size: 1.5rem;
+        }
+        .stats-card {
+            padding: 15px;
+        }
+        .card-header {
+            padding: 0.5rem;
+        }
+        .card-body {
+            padding: 0.75rem;
+        }
+    }
+
+    /* Mobile navigation */
+    .mobile-nav-toggle {
+        display: none;
+    }
+
+    @media (max-width: 991px) {
+        .mobile-nav-toggle {
+            display: block;
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            z-index: 1000;
+            background: #0d6efd;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+        }
+        
+        .sidebar.active {
+            display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            z-index: 999;
+            width: 250px;
+        }
+    }
+
+    /* Visibility fixes */
+    html, body {
+        overflow-x: hidden;
+        width: 100%;
+        min-height: 100vh;
+    }
+
+    .container-fluid {
+        padding-bottom: 2rem;
+    }
+
+    @media (max-width: 991px) {
+        .container-fluid {
+            margin-left: 0;
+            width: 100%;
+            padding: 15px;
+            padding-top: 60px; /* Space for mobile toggle */
+        }
+        
+        .sidebar.active {
+            overflow-y: auto;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.2);
+            background: white;
+        }
+    }
+
+    /* Table visibility fixes */
+    .table-responsive {
+        margin-bottom: 1rem;
+        min-height: 200px;
+    }
+
+    .dataTables_wrapper {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Form controls visibility */
+    .form-control {
+        max-width: 100%;
+    }
+
+    /* Export buttons container */
+    .export-section .d-flex {
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    /* Stats cards visibility */
+    .stats-card {
+        height: 100%;
+        min-height: 120px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    /* Mobile optimization */
+    @media (max-width: 576px) {
+        .row > [class*='col-'] {
+            padding-left: 10px;
+            padding-right: 10px;
+        }
+        
+        .card-body {
+            padding: 15px 10px;
+        }
+
+        .table td, .table th {
+            padding: 8px;
+            white-space: nowrap;
+        }
+
+        .btn-export {
+            width: 100%;
+            margin-right: 0;
+            margin-bottom: 10px;
+        }
+    }
+
+    /* Loading overlay visibility */
+    .loading-overlay {
+        background: rgba(255, 255, 255, 0.9);
+    }
+
+    /* Enhanced text visibility */
+    .table td, .table th {
+        white-space: normal;
+        word-wrap: break-word;
+        min-width: 100px;
+    }
+
+    /* Ensure table cells don't get too narrow */
+    .table .text-truncate {
+        max-width: none !important;
+        white-space: normal;
+        word-wrap: break-word;
+    }
+
+    /* Better responsive tables */
+    .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        max-width: 100%;
+        margin-bottom: 1rem;
+    }
+
+    /* Enhanced card readability */
+    .stats-card {
+        min-height: 150px;
+        word-wrap: break-word;
+    }
+
+    .stats-number {
+        font-size: clamp(18px, 2vw, 24px);
+    }
+
+    /* Form controls visibility */
+    .form-control, .form-select {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    /* Better filter section spacing */
+    .filter-section .row {
+        margin-bottom: 1rem;
+    }
+
+    /* Export buttons improvements */
+    .btn-export {
+        white-space: nowrap;
+        margin-bottom: 0.5rem;
+        min-width: 120px;
+    }
+
+    /* Responsive text sizing */
+    @media (max-width: 768px) {
+        h1 {
+            font-size: clamp(1.5rem, 4vw, 2.5rem);
+        }
+        
+        .table td, .table th {
+            font-size: 14px;
+            padding: 8px 4px;
+        }
+        
+        .stats-card h6 {
+            font-size: 14px;
+        }
+        
+        .form-label {
+            font-size: 14px;
+        }
+    }
+
+    /* Ensure modal content is visible */
+    .modal-content {
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    /* Fix for overlapping content */
+    .card {
+        position: relative;
+        z-index: 1;
+    }
+
+    /* Ensure content doesn't get hidden behind sidebar */
+    .sidebar {
+        z-index: 1000;
+    }
+
+    .row {
+        margin-right: 0;
+        margin-left: 0;
+    }
+    /* Base layout fixes */
+    html, body {
+        overflow-x: hidden;
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        font-size: 16px;
+    }
+
+    /* Improved container layout */
+    .container-fluid {
+        margin-left: 250px;
+        width: calc(100% - 250px);
+        padding: 20px;
+        min-height: calc(100vh - 40px);
+        max-width: 1800px; /* Prevent excessive width on large screens */
+    }
+
+    /* Enhanced table responsiveness */
+    .table-responsive {
+        overflow-x: auto;
+        min-height: 300px;
+        width: 100%;
+    }
+
+    .table {
+        width: 100% !important;
+        margin-bottom: 0;
+        font-size: 14px;
+    }
+
+    .table td, .table th {
+        min-width: 120px;
+        max-width: 300px;
+        white-space: normal;
+        vertical-align: middle;
+        padding: 12px 8px;
+    }
+
+    /* Stats cards improvements */
+    .stats-card {
+        height: 160px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+
+    .stats-number {
+        font-size: 24px;
+        line-height: 1.2;
+    }
+
+    /* Filter section enhancements */
+    .filter-section {
+        padding: 20px;
+        margin-bottom: 25px;
+    }
+
+    .form-control, .form-select {
+        height: 38px;
+    }
+
+    /* Export buttons fixes */
+    .btn-export {
+        min-width: 140px;
+        height: 38px;
+        margin: 5px;
+    }
+
+    /* Mobile responsiveness improvements */
+    @media (max-width: 991px) {
+        .container-fluid {
+            margin-left: 0;
+            width: 100%;
+            padding: 15px;
+            padding-top: 60px;
+        }
+
+        .stats-card {
+            height: 140px;
+        }
+
+        .table td, .table th {
+            min-width: 100px;
+            font-size: 14px;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .stats-card {
+            height: auto;
+            min-height: 120px;
+        }
+
+        .btn-export {
+            width: 100%;
+            margin: 5px 0;
+        }
+
+        .table-responsive {
+            min-height: 200px;
+        }
+    }
+
+    /* DataTables specific fixes */
+    .dataTables_wrapper {
+        width: 100%;
+        padding: 10px 0;
+    }
+
+    .dataTables_filter, 
+    .dataTables_length {
+        margin-bottom: 15px;
+    }
+
+    .dataTables_info, 
+    .dataTables_paginate {
+        margin-top: 15px;
+    }
+
+    /* Ensure proper form layout */
+    .form-group {
+        margin-bottom: 15px;
+    }
+
+    /* Loading overlay improvements */
+    .loading-overlay {
+        background: rgba(255, 255, 255, 0.9);
+    }
+
+    /* Card fixes */
+    .card {
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .card-body {
+        padding: 20px;
+    }
+
+    /* Statistics row spacing */
+    .row.mb-4 {
+        margin: 0 -8px 1rem;
+    }
+
+    .row.mb-4 > [class*='col-'] {
+        padding: 0 8px;
+    }
+
+    /* Adjust container padding for better fit */
+    .container-fluid {
+        padding: 15px 20px;
+    }
+
+    @media (max-width: 1200px) {
+        .stats-card {
+            min-height: 120px;
+        }
+        .stats-number {
+            font-size: 20px;
+        }
+    }
+    /* Base layout improvements */
+    html, body {
+        overflow-x: hidden;
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        font-size: 14px;
+    }
+
+    /* Container adjustments */
+    .container-fluid {
+        margin-left: 250px;
+        width: calc(100% - 250px);
+        padding: 15px;
+        min-height: calc(100vh - 40px);
+        max-width: 1800px;
+    }
+
+    /* Stats cards optimization */
+    .stats-card {
+        background: white;
+        padding: 12px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 15px;
+        min-height: 110px;
+        height: auto;
+    }
+
+    .stats-card h6 {
+        font-size: 13px;
+        margin: 0;
+        line-height: 1.2;
+    }
+
+    .stats-number {
+        font-size: 20px;
+        line-height: 1.2;
+        margin: 6px 0;
+    }
+
+    .stats-card small {
+        font-size: 11px;
+        line-height: 1.2;
+    }
+
+    /* Row spacing adjustments */
+    .row {
+        margin: 0 -8px;
+    }
+
+    .row > [class*='col-'] {
+        padding: 0 8px;
+    }
+
+    /* Table improvements */
+    .table-responsive {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        overflow-x: auto;
+    }
+
+    .table {
+        width: 100% !important;
+        font-size: 13px;
+    }
+
+    .table td, .table th {
+        padding: 8px;
+        min-width: 100px;
+        max-width: none;
+        white-space: normal;
+        word-wrap: break-word;
+    }
+
+    /* Form and filter adjustments */
+    .form-control, .form-select {
+        height: 34px;
+        padding: 6px 10px;
+        font-size: 13px;
+    }
+
+    .filter-section {
+        padding: 15px;
+    }
+
+    /* Export section optimization */
+    .export-section {
+        padding: 12px;
+    }
+
+    .btn-export {
+        padding: 6px 12px;
+        font-size: 13px;
+        min-width: 110px;
+        margin: 4px;
+    }
+
+    /* Responsive improvements */
+    @media (max-width: 1200px) {
+        .container-fluid {
+            padding: 12px;
+        }
+    }
+
+    @media (max-width: 991px) {
+        .container-fluid {
+            margin-left: 0;
+            width: 100%;
+            padding-top: 60px;
+        }
+
+        .stats-card {
+            min-height: 100px;
+        }
+    }
+
+    @media (max-width: 768px) {
+        html, body {
+            font-size: 13px;
+        }
+
+        .stats-number {
+            font-size: 18px;
+        }
+
+        .btn-export {
+            width: calc(50% - 8px);
+            margin: 4px;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .stats-card {
+            min-height: 90px;
+        }
+
+        .btn-export {
+            width: 100%;
+            margin: 4px 0;
+        }
+
+        .container-fluid {
+            padding: 10px;
+            padding-top: 60px;
+        }
+    }
+
+    /* Fix sidebar positioning */
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        width: 250px;
+        z-index: 1030;
+    }
+
+    /* Ensure proper spacing */
+    .mt-4 {
+        margin-top: 1rem !important;
+    }
+
+    .mb-4 {
+        margin-bottom: 1rem !important;
+    }
+
+    /* Card body padding adjustment */
+    .card-body {
+        padding: 15px;
+    }
+
+    /* Remove duplicate styles */
+    [style*="margin"] {
+        margin: initial;
+    }
+
+    [style*="padding"] {
+        padding: initial;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<button class="mobile-nav-toggle" onclick="toggleSidebar()">
+    <i class="fas fa-bars"></i>
+</button>
+<!-- Sidebar -->
+<div class="sidebar">
+    <h1 class="dashboard-title">Reports</h1>
+    <a href="{{ url_for('admin_dashboard') }}" class="menu-btn">Dashboard</a>
+    <a href="{{ url_for('student_list') }}" class="menu-btn">Student List</a>
+    <a href="{{ url_for('current_sit_in') }}" class="menu-btn">Current Sit-in</a>
+    <a href="{{ url_for('sit_in_records') }}" class="menu-btn">Sit-in Records</a>
+    <a href="{{ url_for('reports') }}" class="menu-btn active">Reports</a>
+    <a href="{{ url_for('logout') }}" class="menu-btn logout-btn">Logout</a>
+</div>
+
+<!-- Main Content -->
+<div class="container-fluid px-4">
+    <h1 class="mt-4">Generate Reports</h1>
+
+    <!-- Summary Statistics -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6">
+            <div class="stats-card">
+                <h6>Total Records</h6>
+                <div class="stats-number">{{ total_records|default(0) }}</div>
+                <small class="text-muted">Total sit-in sessions recorded</small>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="stats-card">
+                <h6>Unique Students</h6>
+                <div class="stats-number">{{ unique_students|default(0) }}</div>
+                <small class="text-muted">Different students who used the labs</small>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="stats-card">
+                <h6>Most Active Lab</h6>
+                <div class="stats-number">{{ most_active_lab|default('N/A') }}</div>
+                <small class="text-muted">Laboratory with most visits</small>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="stats-card">
+                <h6>Average Duration</h6>
+                <div class="stats-number">{{ avg_duration|default('0.0h') }}</div>
+                <small class="text-muted">Average time spent per session</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="fas fa-filter me-1"></i>
+            Filter Reports
+        </div>
+        <div class="card-body">
+            <!-- Enhanced Filter Form -->
+            <form class="mb-4" id="filterForm">
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label>Start Date:</label>
+                            <input type="date" name="start_date" class="form-control" value="{{ start_date }}">
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label>End Date:</label>
+                            <input type="date" name="end_date" class="form-control" value="{{ end_date }}">
+                        </div>
+                    </div>
+                    <div id="dateError" class="date-error d-none">End date must be after start date</div>
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label>Laboratory:</label>
+                            <select name="lab" class="form-control">
+                                <option value="">All Labs</option>
+                                {% for lab in labs %}
+                                <option value="{{ lab }}" {% if selected_lab == lab %}selected{% endif %}>{{ lab }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label>Purpose:</label>
+                            <select name="purpose" class="form-control">
+                                <option value="">All Purposes</option>
+                                {% for purpose in purposes %}
+                                <option value="{{ purpose }}" {% if selected_purpose == purpose %}selected{% endif %}>{{ purpose }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary">Apply Filters</button>
+                        <button type="reset" class="btn btn-secondary ms-2">Reset</button>
+                    </div>
+                </div>
+            </form>
+
+            <!-- Export Section with Progress Bars -->
+            <div class="export-section">
+                <h6 class="mb-3">Export Options</h6>
+                <div class="d-flex flex-wrap">
+                    <button onclick="exportReport('csv')" class="btn btn-success btn-export" id="csvBtn">
+                        <i class="fas fa-file-csv me-1"></i>
+                        <span class="btn-text">Export CSV</span>
+                        <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                    </button>
+                    <button onclick="exportReport('excel')" class="btn btn-success btn-export" id="excelBtn">
+                        <i class="fas fa-file-excel me-1"></i>
+                        <span class="btn-text">Export Excel</span>
+                        <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                    </button>
+                    <button onclick="exportReport('pdf')" class="btn btn-success btn-export" id="pdfBtn">
+                        <i class="fas fa-file-pdf me-1"></i>
+                        <span class="btn-text">Export PDF</span>
+                        <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                    </button>
+                </div>
+                <div class="progress progress-bar-export d-none" id="exportProgress">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                </div>
+                <div id="exportStatus" class="alert mt-3 d-none"></div>
+            </div>
+
+            <!-- Enhanced Reports Table -->
+            <div class="table-responsive">
+                <table id="reportsTable" class="table table-bordered table-striped">
+                    <thead>
+                        <tr>
+                            <th>ID Number</th>
+                            <th>Name</th>
+                            <th>Purpose</th>
+                            <th>Laboratory</th>
+                            <th>Login Time</th>
+                            <th>Logout Time</th>
+                            <th>Duration</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for report in reports %}
+                        <tr>
+                            <td>{{ report.id_number }}</td>
+                            <td>{{ report.name }}</td>
+                            <td>{{ report.purpose }}</td>
+                            <td>{{ report.lab }}</td>
+                            <td>{{ report.login_time }}</td>
+                            <td>{{ report.logout_time }}</td>
+                            <td>{{ report.duration }}</td>
+                            <td>{{ report.date }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="loading-overlay">
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.2.9/js/dataTables.responsive.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
+<script>
+$(document).ready(function() {
+    // Date validation
+    function validateDates() {
+        const startDate = new Date($('input[name="start_date"]').val());
+        const endDate = new Date($('input[name="end_date"]').val());
+        const errorDiv = $('#dateError');
+        
+        if (endDate < startDate) {
+            errorDiv.removeClass('d-none');
+            return false;
+        }
+        errorDiv.addClass('d-none');
+        return true;
+    }
+
+    // Initialize DataTable with enhanced features
+    const table = $('#reportsTable').DataTable({
+        responsive: true,
+        order: [[7, 'desc']],
+        pageLength: 25,
+        dom: 'Bfrtip',
+        buttons: [
+            {
+                extend: 'collection',
+                text: 'Export',
+                buttons: [
+                    'copy',
+                    'csv',
+                    'excel',
+                    'pdf',
+                    'print'
+                ]
+            }
+        ],
+        language: {
+            search: "Quick Search:",
+            lengthMenu: "Show _MENU_ entries per page",
+            processing: "Loading records...",
+            zeroRecords: "No matching records found",
+            info: "Showing _START_ to _END_ of _TOTAL_ entries",
+            infoEmpty: "Showing 0 to 0 of 0 entries",
+            infoFiltered: "(filtered from _MAX_ total entries)"
+        },
+        scrollX: true,
+        autoWidth: false,
+        columnDefs: [
+            {
+                targets: '_all',
+                render: function(data, type, row) {
+                    if (type === 'display' && data != null) {
+                        return data; // Remove truncation to show full content
+                    }
+                    return data;
+                }
+            }
+        ],
+        responsive: {
+            details: {
+                type: 'column',
+                target: 'tr'
+            }
+        }
+    });
+
+    // Form submission handling
+    $('#filterForm').on('submit', function(e) {
+        e.preventDefault();
+        if (!validateDates()) return;
+
+        const loadingOverlay = $('.loading-overlay');
+        loadingOverlay.css('display', 'flex');
+
+        const formData = new FormData(this);
+        const searchParams = new URLSearchParams(formData);
+
+        fetch(`${window.location.pathname}?${searchParams.toString()}`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            table.clear();
+            table.rows.add(data.reports);
+            table.draw();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while filtering the reports.');
+        })
+        .finally(() => {
+            loadingOverlay.css('display', 'none');
+        });
+    });
+
+    // Reset button handling
+    $('button[type="reset"]').on('click', function() {
+        setTimeout(() => {
+            $('#filterForm').submit();
+        }, 0);
+    });
+
+    // Make DataTables responsive
+    $('#reportsTable').DataTable({
+        responsive: true,
+        scrollX: true,
+        autoWidth: false,
+        // ...existing DataTable options...
+    });
+
+    // Handle window resize
+    $(window).resize(function() {
+        if ($(window).width() > 991) {
+            $('.sidebar').show();
+        }
+    });
+
+    // Adjust table columns on window resize
+    $(window).on('resize', function() {
+        table.columns.adjust().responsive.recalc();
+    });
+
+    // Initial column adjustment
+    table.columns.adjust().responsive.recalc();
+});
+
+function toggleSidebar() {
+    $('.sidebar').toggleClass('active');
+}
+
+// Close sidebar when clicking outside on mobile
+$(document).on('click', function(e) {
+    if ($(window.innerWidth <= 991)) {
+        if (!$(e.target).closest('.sidebar').length && !$(e.target).closest('.mobile-nav-toggle').length) {
+            $('.sidebar').removeClass('active');
+        }
+    }
+});
+
+// Enhanced export function
+async function exportReport(format) {
+    const btn = document.getElementById(`${format}Btn`);
+    const spinner = btn.querySelector('.spinner-border');
+    const btnText = btn.querySelector('.btn-text');
+    const statusDiv = document.getElementById('exportStatus');
+    const progressBar = document.getElementById('exportProgress');
+    const progress = progressBar.querySelector('.progress-bar');
+    const loadingOverlay = $('.loading-overlay');
+    loadingOverlay.css('display', 'flex');
+    
+    try {
+        // Show loading state
+        btn.disabled = true;
+        spinner.classList.remove('d-none');
+        btnText.textContent = `Exporting ${format.toUpperCase()}...`;
+        progressBar.classList.remove('d-none');
+        progress.style.width = '0%';
+        
+        const params = new URLSearchParams(window.location.search);
+        const url = `/export_reports/${format}?start_date=${params.get('start_date') || ''}&end_date=${params.get('end_date') || ''}`;
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error(`Export failed: ${response.statusText}`);
+        }
+        
+        // Create blob and download
+        const blob = await response.blob();
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = `reports_${new Date().toISOString().slice(0,10)}.${format}`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(downloadUrl);
+        document.body.removeChild(a);
+        
+        statusDiv.textContent = `Export completed successfully!`;
+        statusDiv.classList.remove('d-none', 'alert-danger');
+        statusDiv.classList.add('alert-success');
+        progress.style.width = '100%';
+        
+    } catch (error) {
+        console.error('Export error:', error);
+        statusDiv.textContent = `Export failed: ${error.message}`;
+        statusDiv.classList.remove('d-none', 'alert-success');
+        statusDiv.classList.add('alert-danger');
+        progress.style.width = '0%';
+    } finally {
+        btn.disabled = false;
+        spinner.classList.add('d-none');
+        btnText.textContent = `Export ${format.toUpperCase()}`;
+        
+        // Hide status message after 3 seconds
+        setTimeout(() => {
+            statusDiv.classList.add('d-none');
+            progressBar.classList.add('d-none');
+        }, 3000);
+        loadingOverlay.css('display', 'none');
+    }
+}
+</script>
+{% endblock %}
