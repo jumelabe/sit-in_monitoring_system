@@ -338,32 +338,6 @@ def dashboard():
 
     return render_template('dashboard.html', user=user_data, announcements=announcements)
 
-def insert_sit_in_record(id_number, name, sit_purpose, laboratory, login_time, date, action):
-    try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            
-            # Insert into sit_in_history
-            cursor.execute("""
-                INSERT INTO sit_in_history (id_number, name, sit_purpose, laboratory, login_time, date, action)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (id_number, name, sit_purpose, laboratory, login_time, date, action))
-            
-            # Get the student's session count
-            cursor.execute("SELECT session_count FROM students WHERE idno = ?", (id_number,))
-            session_count = cursor.fetchone()["session_count"]
-            
-            # Insert into current_sit_in
-            cursor.execute("""
-                INSERT INTO current_sit_in (id_number, name, purpose, sit_lab, session, status)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (id_number, name, sit_purpose, laboratory, session_count, 'Active'))
-            
-            conn.commit()
-    except sqlite3.Error as e:
-        print(f"Database error: {e}")
-        raise
-
 @app.route('/sit_in', methods=['POST'])
 def sit_in():
     id_number = request.form.get('id_number')
@@ -473,15 +447,6 @@ def update_logout():
         return jsonify({"message": f"Database error: {str(e)}"}), 500
     finally:
         conn.close()
-
-@app.route('/get_sit_in_history', methods=['GET'])
-def get_sit_in_history():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM sit_in_history")
-    records = cursor.fetchall()
-    conn.close()
-    return jsonify([dict(zip([column[0] for column in cursor.description], row)) for row in records])
 
 @app.route('/sit_in_history')
 @login_required
@@ -793,52 +758,42 @@ def reports():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Calculate statistics with NULL handling
+        # Get basic statistics
         cursor.execute("""
             SELECT 
                 COUNT(*) as total_records,
                 COUNT(DISTINCT id_number) as unique_students,
-                COALESCE(
-                    (
-                        SELECT lab
-                        FROM sit_in_records
-                        GROUP BY lab
-                        ORDER BY COUNT(*) DESC
-                        LIMIT 1
-                    ),
-                    'N/A'
+                (
+                    SELECT lab
+                    FROM sit_in_records 
+                    GROUP BY lab 
+                    ORDER BY COUNT(*) DESC 
+                    LIMIT 1
                 ) as most_active_lab,
-                COALESCE(
-                    AVG(
-                        CASE 
-                            WHEN login_time IS NOT NULL AND logout_time IS NOT NULL
-                            THEN ROUND((julianday(logout_time) - julianday(login_time)) * 24, 1)
-                            ELSE NULL
-                        END
-                    ),
-                    0
-                ) as avg_duration
+                ROUND(AVG(
+                    CASE 
+                        WHEN login_time IS NOT NULL AND logout_time IS NOT NULL
+                        THEN (julianday(logout_time) - julianday(login_time)) * 24
+                        ELSE NULL
+                    END
+                ), 1) as avg_duration
             FROM sit_in_records
             WHERE date BETWEEN ? AND ?
         """, (start_date, end_date))
         
         stats = cursor.fetchone()
         
-        # Fetch reports data with duration calculation
+        # Get reports data
         cursor.execute("""
             SELECT 
                 id_number,
                 name,
                 purpose,
-                lab, 
-                login_time,
-                logout_time,
+                lab,
+                datetime(login_time) as login_time,
+                datetime(logout_time) as logout_time,
                 date,
-                CASE 
-                    WHEN login_time IS NOT NULL AND logout_time IS NOT NULL
-                    THEN ROUND((julianday(logout_time) - julianday(login_time)) * 24, 1)
-                    ELSE 0
-                END as duration
+                ROUND((julianday(logout_time) - julianday(login_time)) * 24, 1) as duration
             FROM sit_in_records
             WHERE date BETWEEN ? AND ?
             ORDER BY date DESC, login_time DESC
@@ -853,76 +808,79 @@ def reports():
         cursor.execute("SELECT DISTINCT purpose FROM sit_in_records WHERE purpose IS NOT NULL ORDER BY purpose")
         purposes = [row['purpose'] for row in cursor.fetchall()]
         
-        # Format stats with safe handling of None values
+        conn.close()
+
+        if request.headers.get('Accept') == 'application/json':
+            return jsonify({
+                'reports': [dict(row) for row in reports],
+                'stats': dict(stats)
+            })
+
         formatted_stats = {
-            'total_records': stats['total_records'] or 0,
-            'unique_students': stats['unique_students'] or 0,
+            'total_records': stats['total_records'],
+            'unique_students': stats['unique_students'],
             'most_active_lab': stats['most_active_lab'] or 'N/A',
-            'avg_duration': f"{stats['avg_duration']:.1f}h" if stats['avg_duration'] is not None else '0.0h'
+            'avg_duration': f"{stats['avg_duration']:.1f}h" if stats['avg_duration'] else '0.0h'
         }
         
-        conn.close()
-        
-        return render_template('admin/reports.html', 
+        return render_template('admin/reports.html',
                              reports=reports,
-                             start_date=start_date, 
+                             start_date=start_date,
                              end_date=end_date,
-                             total_records=formatted_stats['total_records'],
-                             unique_students=formatted_stats['unique_students'],
-                             most_active_lab=formatted_stats['most_active_lab'],
-                             avg_duration=formatted_stats['avg_duration'],
                              labs=labs,
-                             purposes=purposes)
+                             purposes=purposes,
+                             **formatted_stats)
                              
     except Exception as e:
-        print(f"Error fetching reports: {str(e)}")  # Add debug print
-        flash(f"Error fetching reports: {str(e)}", "danger")
+        print(f"Error in reports: {str(e)}")
+        flash("Error loading reports", "danger")
         return redirect(url_for('admin_dashboard'))
 
 @app.route('/export_reports/<format>')
 @admin_required
 def export_reports(format):
     try:
-        start_date = request.args.get('start_date', '')
-        end_date = request.args.get('end_date', '')
-        
-        # Input validation
-        if start_date and end_date:
-            try:
-                datetime.strptime(start_date, '%Y-%m-%d')
-                datetime.strptime(end_date, '%Y-%m-%d')
-            except ValueError:
-                return jsonify({'error': 'Invalid date format'}), 400
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
         
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        try:
-            query = """
-                SELECT id_number, name, purpose, lab,
-                       strftime('%Y-%m-%d %H:%M:%S', login_time) as login_time,
-                       strftime('%Y-%m-%d %H:%M:%S', logout_time) as logout_time,
-                       strftime('%Y-%m-%d', date) as date,
-                       CASE 
-                           WHEN login_time IS NOT NULL AND logout_time IS NOT NULL
-                           THEN ROUND((julianday(logout_time) - julianday(login_time)) * 24, 1)
-                           ELSE NULL 
-                       END as duration
-                FROM sit_in_records
-            """
+        # Improved query with better date handling and duration calculation
+        query = """
+            SELECT 
+                id_number,
+                name,
+                purpose,
+                lab,
+                datetime(login_time) as login_time,
+                datetime(logout_time) as logout_time,
+                date,
+                CASE 
+                    WHEN login_time IS NOT NULL AND logout_time IS NOT NULL
+                    THEN ROUND((julianday(logout_time) - julianday(login_time)) * 24, 1)
+                    ELSE NULL
+                END as duration
+            FROM sit_in_records
+            WHERE 1=1
+        """
+        params = []
+        
+        if start_date and end_date:
+            query += " AND date BETWEEN ? AND ?"
+            params.extend([start_date, end_date])
             
-            params = []
-            if start_date and end_date:
-                query += " WHERE date BETWEEN ? AND ?"
-                params = [start_date, end_date]
-            
-            query += " ORDER BY date DESC, login_time DESC"
-            cursor.execute(query, params)
-            reports = cursor.fetchall()
-            
-            if not reports:
-                return jsonify({'error': 'No data available for the selected period'}), 404
+        query += " ORDER BY date DESC, login_time DESC"
+        
+        cursor.execute(query, params)
+        reports = [dict(row) for row in cursor.fetchall()]
+        conn.close()
 
+        if not reports:
+            flash("No data available for export", "warning")
+            return redirect(url_for('reports'))
+
+        try:
             if format == 'csv':
                 return export_to_csv(reports)
             elif format == 'excel':
@@ -930,183 +888,190 @@ def export_reports(format):
             elif format == 'pdf':
                 return export_to_pdf(reports, start_date, end_date)
             else:
-                return jsonify({'error': 'Invalid export format'}), 400
-
-        except sqlite3.Error as e:
-            return jsonify({'error': f'Database error: {str(e)}'}), 500
-        finally:
-            conn.close()
+                flash("Invalid export format", "error")
+                return redirect(url_for('reports'))
+        except Exception as e:
+            flash(f"Export failed: {str(e)}", "error")
+            return redirect(url_for('reports'))
 
     except Exception as e:
-        print(f"Export error: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        flash(f"Export error: {str(e)}", "error")
+        return redirect(url_for('reports'))
 
 def export_to_csv(reports):
-    try:
-        si = io.StringIO()
-        writer = csv.writer(si)
-        
-        # Write headers
-        writer.writerow(['ID Number', 'Name', 'Purpose', 'Laboratory', 
-                        'Login Time', 'Logout Time', 'Date', 'Duration (hours)'])
-        
-        # Write data
-        for report in reports:
-            writer.writerow([
-                report['id_number'],
-                report['name'],
-                report['purpose'],
-                report['lab'],
-                report['login_time'] or '',
-                report['logout_time'] or '',
-                report['date'] or '',
-                f"{report['duration']:.1f}" if report['duration'] else ''
-            ])
-        
-        output = make_response(si.getvalue())
-        output.headers["Content-Disposition"] = f"attachment; filename=sit_in_reports_{datetime.now().strftime('%Y%m%d')}.csv"
-        output.headers["Content-type"] = "text/csv; charset=utf-8"
-        return output
-    except Exception as e:
-        raise Exception(f"CSV export error: {str(e)}")
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Write headers
+    writer.writerow(['ID Number', 'Name', 'Purpose', 'Laboratory', 
+                    'Login Time', 'Logout Time', 'Date', 'Duration (hours)'])
+    
+    # Write data
+    for report in reports:
+        writer.writerow([
+            report['id_number'],
+            report['name'],
+            report['purpose'],
+            report['lab'],
+            report['login_time'],
+            report['logout_time'],
+            report['date'],
+            f"{report['duration']:.1f}" if report['duration'] else ''
+        ])
+    
+    response = make_response(output.getvalue())
+    response.headers['Content-Type'] = 'text/csv'
+    response.headers['Content-Disposition'] = f'attachment; filename=sit_in_reports_{datetime.now().strftime("%Y%m%d")}.csv'
+    return response
 
 def export_to_excel(reports, start_date=None, end_date=None):
-    try:
-        output = BytesIO()
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "Sit-in Reports"
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Sit-in Reports"
 
-        # Add title and metadata
-        ws.merge_cells('A1:H1')
-        title_cell = ws['A1']
-        title_cell.value = "Sit-in Reports"
-        title_cell.font = Font(bold=True, size=14)
-        title_cell.alignment = Alignment(horizontal='center')
+    # Title and date range
+    ws.merge_cells('A1:H1')
+    ws['A1'] = "Sit-in Reports"
+    ws['A1'].font = Font(bold=True, size=14)
+    ws['A1'].alignment = Alignment(horizontal='center')
 
-        # Add date range if provided
+    if start_date and end_date:
+        ws.merge_cells('A2:H2')
+        ws['A2'] = f"Period: {start_date} to {end_date}"
+        ws['A2'].alignment = Alignment(horizontal='center')
+        current_row = 3
+    else:
         current_row = 2
-        if start_date and end_date:
-            ws.merge_cells('A2:H2')
-            ws['A2'].value = f"Period: {start_date} to {end_date}"
-            ws['A2'].alignment = Alignment(horizontal='center')
-            current_row = 3
 
-        # Headers
-        headers = ['ID Number', 'Name', 'Purpose', 'Laboratory', 
-                  'Login Time', 'Logout Time', 'Date', 'Duration (hours)']
-        
-        for col, header in enumerate(headers, 1):
-            cell = ws.cell(row=current_row, column=col)
-            cell.value = header
-            cell.font = Font(bold=True)
-            cell.fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
-
-        # Data
-        for row_idx, report in enumerate(reports, current_row + 1):
-            ws.cell(row=row_idx, column=1).value = report['id_number']
-            ws.cell(row=row_idx, column=2).value = report['name']
-            ws.cell(row=row_idx, column=3).value = report['purpose']
-            ws.cell(row=row_idx, column=4).value = report['lab']
-            ws.cell(row=row_idx, column=5).value = report['login_time']
-            ws.cell(row=row_idx, column=6).value = report['logout_time']
-            ws.cell(row=row_idx, column=7).value = report['date']
-            ws.cell(row=row_idx, column=8).value = f"{report['duration']:.1f}" if report['duration'] else ''
-
-        # Auto-adjust column widths
-        for column in ws.columns:
-            max_length = 0
-            column = [cell for cell in column]
-            for cell in column:
-                try:
-                    if len(str(cell.value)) > max_length:
-                        max_length = len(str(cell.value))
-                except:
-                    pass
-            adjusted_width = (max_length + 2)
-            ws.column_dimensions[column[0].column_letter].width = adjusted_width
-
-        wb.save(output)
-        output.seek(0)
-        
-        return send_file(
-            output,
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            as_attachment=True,
-            download_name=f'sit_in_reports_{datetime.now().strftime("%Y%m%d")}.xlsx'
+    # Headers with styling
+    headers = ['ID Number', 'Name', 'Purpose', 'Laboratory', 
+              'Login Time', 'Logout Time', 'Date', 'Duration (hours)']
+    
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=current_row, column=col)
+        cell.value = header
+        cell.font = Font(bold=True)
+        cell.fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
+        cell.border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
         )
-    except Exception as e:
-        raise Exception(f"Excel export error: {str(e)}")
+
+    # Data
+    for row_idx, report in enumerate(reports, current_row + 1):
+        for col, value in enumerate([
+            report['id_number'],
+            report['name'],
+            report['purpose'],
+            report['lab'],
+            report['login_time'],
+            report['logout_time'],
+            report['date'],
+            f"{report['duration']:.1f}" if report['duration'] else ''
+        ], 1):
+            cell = ws.cell(row=row_idx, column=col)
+            cell.value = value
+            cell.border = Border(
+                left=Side(style='thin'),
+                right=Side(style='thin'),
+                top=Side(style='thin'),
+                bottom=Side(style='thin')
+            )
+
+    # Auto-adjust column widths
+    for col in ws.columns:
+        max_length = 0
+        column = [cell for cell in col]
+        for cell in column:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = (max_length + 2)
+        ws.column_dimensions[get_column_letter(column[0].column)].width = adjusted_width
+
+    # Save to BytesIO
+    excel_file = BytesIO()
+    wb.save(excel_file)
+    excel_file.seek(0)
+
+    return send_file(
+        excel_file,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=f'sit_in_reports_{datetime.now().strftime("%Y%m%d")}.xlsx'
+    )
 
 def export_to_pdf(reports, start_date=None, end_date=None):
-    try:
-        buffer = BytesIO()
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=letter,
-            rightMargin=30,
-            leftMargin=30,
-            topMargin=30,
-            bottomMargin=18
-        )
-        
-        elements = []
-        styles = getSampleStyleSheet()
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        rightMargin=30,
+        leftMargin=30,
+        topMargin=30,
+        bottomMargin=18
+    )
 
-        # Title
-        elements.append(Paragraph("Sit-in Reports", styles['Title']))
-        elements.append(Spacer(1, 12))
+    elements = []
+    styles = getSampleStyleSheet()
 
-        # Date range and generation time
-        if start_date and end_date:
-            elements.append(Paragraph(f"Period: {start_date} to {end_date}", styles['Normal']))
-        elements.append(Paragraph(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
-        elements.append(Spacer(1, 12))
+    # Title
+    elements.append(Paragraph("Sit-in Reports", styles['Title']))
+    elements.append(Spacer(1, 12))
 
-        # Table data
-        data = [['ID Number', 'Name', 'Purpose', 'Laboratory', 
-                 'Login Time', 'Logout Time', 'Date', 'Duration (hrs)']]
-                 
-        for report in reports:
-            data.append([
-                str(report['id_number']),
-                str(report['name']),
-                str(report['purpose']),
-                str(report['lab']),
-                str(report['login_time'] or ''),
-                str(report['logout_time'] or ''),
-                str(report['date'] or ''),
-                f"{report['duration']:.1f}" if report['duration'] else ''
-            ])
+    # Date range and generation time
+    if start_date and end_date:
+        elements.append(Paragraph(f"Period: {start_date} to {end_date}", styles['Normal']))
+    elements.append(Paragraph(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
+    elements.append(Spacer(1, 12))
 
-        # Create and style the table
-        table = Table(data)
-        table.setStyle(TableStyle([
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0,0), (-1,0), 10),
-            ('BOTTOMPADDING', (0,0), (-1,0), 12),
-            ('BACKGROUND', (0,0), (-1,0), colors.grey),
-            ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
-            ('FONTSIZE', (0,1), (-1,-1), 8),
-            ('GRID', (0,0), (-1,-1), 1, colors.black),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ]))
+    # Prepare table data
+    table_data = [['ID Number', 'Name', 'Purpose', 'Laboratory', 
+                   'Login Time', 'Logout Time', 'Date', 'Duration (hrs)']]
+    
+    for report in reports:
+        table_data.append([
+            str(report['id_number']),
+            str(report['name']),
+            str(report['purpose']),
+            str(report['lab']),
+            str(report['login_time'] or ''),
+            str(report['logout_time'] or ''),
+            str(report['date']),
+            f"{report['duration']:.1f}" if report['duration'] else ''
+        ])
 
-        elements.append(table)
-        doc.build(elements)
-        buffer.seek(0)
-        
-        return send_file(
-            buffer,
-            mimetype='application/pdf',
-            as_attachment=True,
-            download_name=f'sit_in_reports_{datetime.now().strftime("%Y%m%d")}.pdf'
-        )
-    except Exception as e:
-        raise Exception(f"PDF export error: {str(e)}")
+    # Create and style the table
+    table = Table(table_data, repeatRows=1)
+    table.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,0), 10),
+        ('BOTTOMPADDING', (0,0), (-1,0), 12),
+        ('BACKGROUND', (0,0), (-1,0), colors.grey),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
+        ('FONTSIZE', (0,1), (-1,-1), 8),
+        ('GRID', (0,0), (-1,-1), 1, colors.black),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('WORDWRAP', (0,0), (-1,-1), True),
+    ]))
+
+    elements.append(table)
+    doc.build(elements)
+    buffer.seek(0)
+
+    return send_file(
+        buffer,
+        mimetype='application/pdf',
+        as_attachment=True,
+        download_name=f'sit_in_reports_{datetime.now().strftime("%Y%m%d")}.pdf'
+    )
 
 @app.errorhandler(Exception)
 def handle_error(error):
@@ -1118,3 +1083,4 @@ def handle_error(error):
 
 if __name__ == '__main__':
     app.run(debug=True)
+    #app.run(debug=True, host='172.19.131.164', port=5000)

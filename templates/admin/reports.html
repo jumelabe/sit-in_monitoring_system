@@ -7,9 +7,8 @@
 <link href="https://cdn.datatables.net/buttons/2.2.2/css/buttons.bootstrap5.min.css" rel="stylesheet">
 <link href="https://cdn.datatables.net/responsive/2.2.9/css/responsive.bootstrap5.min.css" rel="stylesheet">
 <style>
-    .btn-export {
-        margin-right: 10px;
-    }
+    /* Remove duplicate CSS rules and keep only the most recent/relevant ones */
+    .btn-export { margin-right: 10px; }
     .export-section {
         background: #f8f9fa;
         padding: 15px;
@@ -23,7 +22,6 @@
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         margin-bottom: 20px;
     }
-    /* Adjust main content margin */
     .container-fluid {
         margin-left: 250px;
         width: calc(100% - 250px);
@@ -62,112 +60,24 @@
         align-items: center;
         z-index: 9999;
     }
-    .date-error {
-        color: #dc3545;
-        font-size: 0.875rem;
-        margin-top: 0.25rem;
-    }
-    .stats-card h6 {
-        color: #495057;
-        font-size: 14px;
-        font-weight: 600;
-        margin: 0;
-        line-height: 1.2;
-    }
-    .stats-card small {
-        color: #6c757d;
-        font-size: 12px;
-        line-height: 1.2;
-    }
-    .mt-4 {
-        margin-top: 2rem !important;
-        font-size: 2rem;
-        color: #333;
-        position: relative;
-        z-index: 1;
-    }
-    /* Responsive styles */
+
+    /* Mobile responsiveness */
     @media (max-width: 991px) {
         .container-fluid {
             margin-left: 0;
             width: 100%;
-            padding: 70px 15px 15px 15px; /* Added top padding for mobile */
-        }
-        .sidebar {
-            display: none;
-        }
-        .stats-card {
-            margin-bottom: 15px;
-            min-height: 140px;
-        }
-        .mt-4 {
-            font-size: 1.5rem;
-            margin-top: 1rem !important;
-        }
-    }
-
-    @media (max-width: 768px) {
-        .btn-export {
-            margin-bottom: 10px;
-            width: 100%;
-        }
-        .export-section .d-flex {
-            flex-direction: column;
-        }
-        .stats-number {
-            font-size: 18px;
-        }
-        .filter-section {
             padding: 15px;
+            padding-top: 60px;
         }
-        .table-responsive {
-            overflow-x: auto;
-        }
-        .stats-card {
-            min-height: 110px;
-        }
-        .stats-card h6 {
-            font-size: 13px;
-        }
-        .stats-card small {
-            font-size: 11px;
-        }
-    }
 
-    @media (max-width: 576px) {
-        h1 {
-            font-size: 1.5rem;
-        }
-        .stats-card {
-            padding: 15px;
-        }
-        .card-header {
-            padding: 0.5rem;
-        }
-        .card-body {
-            padding: 0.75rem;
-        }
-    }
-
-    /* Mobile navigation */
-    .mobile-nav-toggle {
-        display: none;
-    }
-
-    @media (max-width: 991px) {
         .mobile-nav-toggle {
             display: block;
             position: fixed;
             top: 15px;
             left: 15px;
             z-index: 1000;
-            background: #0d6efd;
-            color: white;
-            border: none;
-            padding: 8px 12px;
-            border-radius: 4px;
         }
-        
+
         .sidebar.active {
             display: block;
             position: fixed;
@@ -179,526 +89,11 @@
         }
     }
 
-    /* Visibility fixes */
-    html, body {
-        overflow-x: hidden;
-        width: 100%;
-        min-height: 100vh;
-    }
-
-    .container-fluid {
-        padding-bottom: 2rem;
-    }
-
-    @media (max-width: 991px) {
-        .container-fluid {
-            margin-left: 0;
-            width: 100%;
-            padding: 15px;
-            padding-top: 60px; /* Space for mobile toggle */
-        }
-        
-        .sidebar.active {
-            overflow-y: auto;
-            box-shadow: 2px 0 5px rgba(0,0,0,0.2);
-            background: white;
-        }
-    }
-
-    /* Table visibility fixes */
-    .table-responsive {
-        margin-bottom: 1rem;
-        min-height: 200px;
-    }
-
-    .dataTables_wrapper {
-        width: 100%;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-
-    /* Form controls visibility */
-    .form-control {
-        max-width: 100%;
-    }
-
-    /* Export buttons container */
-    .export-section .d-flex {
-        gap: 10px;
-        flex-wrap: wrap;
-    }
-
-    /* Stats cards visibility */
-    .stats-card {
-        height: 100%;
-        min-height: 120px;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-    }
-
-    /* Mobile optimization */
     @media (max-width: 576px) {
-        .row > [class*='col-'] {
-            padding-left: 10px;
-            padding-right: 10px;
-        }
-        
-        .card-body {
-            padding: 15px 10px;
-        }
-
-        .table td, .table th {
-            padding: 8px;
-            white-space: nowrap;
-        }
-
-        .btn-export {
-            width: 100%;
-            margin-right: 0;
-            margin-bottom: 10px;
-        }
-    }
-
-    /* Loading overlay visibility */
-    .loading-overlay {
-        background: rgba(255, 255, 255, 0.9);
-    }
-
-    /* Enhanced text visibility */
-    .table td, .table th {
-        white-space: normal;
-        word-wrap: break-word;
-        min-width: 100px;
-    }
-
-    /* Ensure table cells don't get too narrow */
-    .table .text-truncate {
-        max-width: none !important;
-        white-space: normal;
-        word-wrap: break-word;
-    }
-
-    /* Better responsive tables */
-    .table-responsive {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        max-width: 100%;
-        margin-bottom: 1rem;
-    }
-
-    /* Enhanced card readability */
-    .stats-card {
-        min-height: 150px;
-        word-wrap: break-word;
-    }
-
-    .stats-number {
-        font-size: clamp(18px, 2vw, 24px);
-    }
-
-    /* Form controls visibility */
-    .form-control, .form-select {
-        width: 100%;
-        max-width: 100%;
-    }
-
-    /* Better filter section spacing */
-    .filter-section .row {
-        margin-bottom: 1rem;
-    }
-
-    /* Export buttons improvements */
-    .btn-export {
-        white-space: nowrap;
-        margin-bottom: 0.5rem;
-        min-width: 120px;
-    }
-
-    /* Responsive text sizing */
-    @media (max-width: 768px) {
-        h1 {
-            font-size: clamp(1.5rem, 4vw, 2.5rem);
-        }
-        
-        .table td, .table th {
-            font-size: 14px;
-            padding: 8px 4px;
-        }
-        
-        .stats-card h6 {
-            font-size: 14px;
-        }
-        
-        .form-label {
-            font-size: 14px;
-        }
-    }
-
-    /* Ensure modal content is visible */
-    .modal-content {
-        max-height: 90vh;
-        overflow-y: auto;
-    }
-
-    /* Fix for overlapping content */
-    .card {
-        position: relative;
-        z-index: 1;
-    }
-
-    /* Ensure content doesn't get hidden behind sidebar */
-    .sidebar {
-        z-index: 1000;
-    }
-
-    .row {
-        margin-right: 0;
-        margin-left: 0;
-    }
-    /* Base layout fixes */
-    html, body {
-        overflow-x: hidden;
-        width: 100%;
-        height: 100%;
-        margin: 0;
-        padding: 0;
-        font-size: 16px;
-    }
-
-    /* Improved container layout */
-    .container-fluid {
-        margin-left: 250px;
-        width: calc(100% - 250px);
-        padding: 20px;
-        min-height: calc(100vh - 40px);
-        max-width: 1800px; /* Prevent excessive width on large screens */
-    }
-
-    /* Enhanced table responsiveness */
-    .table-responsive {
-        overflow-x: auto;
-        min-height: 300px;
-        width: 100%;
-    }
-
-    .table {
-        width: 100% !important;
-        margin-bottom: 0;
-        font-size: 14px;
-    }
-
-    .table td, .table th {
-        min-width: 120px;
-        max-width: 300px;
-        white-space: normal;
-        vertical-align: middle;
-        padding: 12px 8px;
-    }
-
-    /* Stats cards improvements */
-    .stats-card {
-        height: 160px;
-        padding: 15px;
-        margin-bottom: 20px;
-    }
-
-    .stats-number {
-        font-size: 24px;
-        line-height: 1.2;
-    }
-
-    /* Filter section enhancements */
-    .filter-section {
-        padding: 20px;
-        margin-bottom: 25px;
-    }
-
-    .form-control, .form-select {
-        height: 38px;
-    }
-
-    /* Export buttons fixes */
-    .btn-export {
-        min-width: 140px;
-        height: 38px;
-        margin: 5px;
-    }
-
-    /* Mobile responsiveness improvements */
-    @media (max-width: 991px) {
-        .container-fluid {
-            margin-left: 0;
-            width: 100%;
-            padding: 15px;
-            padding-top: 60px;
-        }
-
-        .stats-card {
-            height: 140px;
-        }
-
-        .table td, .table th {
-            min-width: 100px;
-            font-size: 14px;
-        }
-    }
-
-    @media (max-width: 576px) {
-        .stats-card {
-            height: auto;
-            min-height: 120px;
-        }
-
         .btn-export {
             width: 100%;
             margin: 5px 0;
         }
-
-        .table-responsive {
-            min-height: 200px;
-        }
-    }
-
-    /* DataTables specific fixes */
-    .dataTables_wrapper {
-        width: 100%;
-        padding: 10px 0;
-    }
-
-    .dataTables_filter, 
-    .dataTables_length {
-        margin-bottom: 15px;
-    }
-
-    .dataTables_info, 
-    .dataTables_paginate {
-        margin-top: 15px;
-    }
-
-    /* Ensure proper form layout */
-    .form-group {
-        margin-bottom: 15px;
-    }
-
-    /* Loading overlay improvements */
-    .loading-overlay {
-        background: rgba(255, 255, 255, 0.9);
-    }
-
-    /* Card fixes */
-    .card {
-        margin-bottom: 20px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-
-    .card-body {
-        padding: 20px;
-    }
-
-    /* Statistics row spacing */
-    .row.mb-4 {
-        margin: 0 -8px 1rem;
-    }
-
-    .row.mb-4 > [class*='col-'] {
-        padding: 0 8px;
-    }
-
-    /* Adjust container padding for better fit */
-    .container-fluid {
-        padding: 15px 20px;
-    }
-
-    @media (max-width: 1200px) {
-        .stats-card {
-            min-height: 120px;
-        }
-        .stats-number {
-            font-size: 20px;
-        }
-    }
-    /* Base layout improvements */
-    html, body {
-        overflow-x: hidden;
-        width: 100%;
-        height: 100%;
-        margin: 0;
-        padding: 0;
-        font-size: 14px;
-    }
-
-    /* Container adjustments */
-    .container-fluid {
-        margin-left: 250px;
-        width: calc(100% - 250px);
-        padding: 15px;
-        min-height: calc(100vh - 40px);
-        max-width: 1800px;
-    }
-
-    /* Stats cards optimization */
-    .stats-card {
-        background: white;
-        padding: 12px;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        margin-bottom: 15px;
-        min-height: 110px;
-        height: auto;
-    }
-
-    .stats-card h6 {
-        font-size: 13px;
-        margin: 0;
-        line-height: 1.2;
-    }
-
-    .stats-number {
-        font-size: 20px;
-        line-height: 1.2;
-        margin: 6px 0;
-    }
-
-    .stats-card small {
-        font-size: 11px;
-        line-height: 1.2;
-    }
-
-    /* Row spacing adjustments */
-    .row {
-        margin: 0 -8px;
-    }
-
-    .row > [class*='col-'] {
-        padding: 0 8px;
-    }
-
-    /* Table improvements */
-    .table-responsive {
-        margin: 0;
-        padding: 0;
-        width: 100%;
-        overflow-x: auto;
-    }
-
-    .table {
-        width: 100% !important;
-        font-size: 13px;
-    }
-
-    .table td, .table th {
-        padding: 8px;
-        min-width: 100px;
-        max-width: none;
-        white-space: normal;
-        word-wrap: break-word;
-    }
-
-    /* Form and filter adjustments */
-    .form-control, .form-select {
-        height: 34px;
-        padding: 6px 10px;
-        font-size: 13px;
-    }
-
-    .filter-section {
-        padding: 15px;
-    }
-
-    /* Export section optimization */
-    .export-section {
-        padding: 12px;
-    }
-
-    .btn-export {
-        padding: 6px 12px;
-        font-size: 13px;
-        min-width: 110px;
-        margin: 4px;
-    }
-
-    /* Responsive improvements */
-    @media (max-width: 1200px) {
-        .container-fluid {
-            padding: 12px;
-        }
-    }
-
-    @media (max-width: 991px) {
-        .container-fluid {
-            margin-left: 0;
-            width: 100%;
-            padding-top: 60px;
-        }
-
-        .stats-card {
-            min-height: 100px;
-        }
-    }
-
-    @media (max-width: 768px) {
-        html, body {
-            font-size: 13px;
-        }
-
-        .stats-number {
-            font-size: 18px;
-        }
-
-        .btn-export {
-            width: calc(50% - 8px);
-            margin: 4px;
-        }
-    }
-
-    @media (max-width: 576px) {
-        .stats-card {
-            min-height: 90px;
-        }
-
-        .btn-export {
-            width: 100%;
-            margin: 4px 0;
-        }
-
-        .container-fluid {
-            padding: 10px;
-            padding-top: 60px;
-        }
-    }
-
-    /* Fix sidebar positioning */
-    .sidebar {
-        position: fixed;
-        top: 0;
-        left: 0;
-        height: 100vh;
-        width: 250px;
-        z-index: 1030;
-    }
-
-    /* Ensure proper spacing */
-    .mt-4 {
-        margin-top: 1rem !important;
-    }
-
-    .mb-4 {
-        margin-bottom: 1rem !important;
-    }
-
-    /* Card body padding adjustment */
-    .card-body {
-        padding: 15px;
-    }
-
-    /* Remove duplicate styles */
-    [style*="margin"] {
-        margin: initial;
-    }
-
-    [style*="padding"] {
-        padding: initial;
     }
 </style>
 {% endblock %}
@@ -1032,60 +427,64 @@ async function exportReport(format) {
     const spinner = btn.querySelector('.spinner-border');
     const btnText = btn.querySelector('.btn-text');
     const statusDiv = document.getElementById('exportStatus');
-    const progressBar = document.getElementById('exportProgress');
-    const progress = progressBar.querySelector('.progress-bar');
-    const loadingOverlay = $('.loading-overlay');
-    loadingOverlay.css('display', 'flex');
     
     try {
-        // Show loading state
+        // Get date range values
+        const startDate = document.querySelector('input[name="start_date"]').value;
+        const endDate = document.querySelector('input[name="end_date"]').value;
+        
+        // Disable button and show loading state
         btn.disabled = true;
         spinner.classList.remove('d-none');
-        btnText.textContent = `Exporting ${format.toUpperCase()}...`;
-        progressBar.classList.remove('d-none');
-        progress.style.width = '0%';
+        btnText.textContent = `Exporting...`;
         
-        const params = new URLSearchParams(window.location.search);
-        const url = `/export_reports/${format}?start_date=${params.get('start_date') || ''}&end_date=${params.get('end_date') || ''}`;
+        // Build URL with parameters
+        const url = `/export_reports/${format}?start_date=${startDate}&end_date=${endDate}`;
+        
+        // Fetch the file
         const response = await fetch(url);
         
         if (!response.ok) {
             throw new Error(`Export failed: ${response.statusText}`);
         }
         
-        // Create blob and download
+        // Get the filename from the Content-Disposition header if available
+        const contentDisposition = response.headers.get('Content-Disposition');
+        const filename = contentDisposition ? 
+            contentDisposition.split('filename=')[1].replace(/"/g, '') : 
+            `sit_in_reports.${format}`;
+            
+        // Convert response to blob
         const blob = await response.blob();
+        
+        // Create download link and trigger download
         const downloadUrl = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = downloadUrl;
-        a.download = `reports_${new Date().toISOString().slice(0,10)}.${format}`;
+        a.download = filename;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(downloadUrl);
         document.body.removeChild(a);
         
-        statusDiv.textContent = `Export completed successfully!`;
-        statusDiv.classList.remove('d-none', 'alert-danger');
-        statusDiv.classList.add('alert-success');
-        progress.style.width = '100%';
+        // Show success message
+        statusDiv.textContent = 'Export completed successfully!';
+        statusDiv.className = 'alert alert-success mt-3';
         
     } catch (error) {
         console.error('Export error:', error);
         statusDiv.textContent = `Export failed: ${error.message}`;
-        statusDiv.classList.remove('d-none', 'alert-success');
-        statusDiv.classList.add('alert-danger');
-        progress.style.width = '0%';
+        statusDiv.className = 'alert alert-danger mt-3';
     } finally {
+        // Reset button state
         btn.disabled = false;
         spinner.classList.add('d-none');
         btnText.textContent = `Export ${format.toUpperCase()}`;
         
         // Hide status message after 3 seconds
         setTimeout(() => {
-            statusDiv.classList.add('d-none');
-            progressBar.classList.add('d-none');
+            statusDiv.className = 'alert mt-3 d-none';
         }, 3000);
-        loadingOverlay.css('display', 'none');
     }
 }
 </script>
