@@ -26,6 +26,7 @@
                             <th>Time In</th>
                             <th>Time Out</th>
                             <th>Status</th>
+                            <th>Feedback</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -41,10 +42,80 @@
                                     {{ 'Completed' if record.logout_time else 'Active' }}
                                 </span>
                             </td>
+                            <td>
+                                {% if record.feedback %}
+                                    <div class="feedback-content">
+                                        <p class="mb-0">{{ record.feedback }}</p>
+                                        <small class="text-muted">Submitted: {{ record.feedback_date }}</small>
+                                    </div>
+                                {% else %}
+                                    {% if record.logout_time %}  <!-- Only show feedback button for completed sessions -->
+                                        <button type="button" class="btn btn-sm btn-primary feedback-btn" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#feedbackModal-{{ record.id }}">
+                                            <i class="fas fa-comment-dots me-1"></i> Add Feedback
+                                        </button>
+                                    {% else %}
+                                        <span class="text-muted">Session in progress</span>
+                                    {% endif %}
+                                {% endif %}
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
+
+                <!-- Move Modals outside the table -->
+                {% for record in history %}
+                    {% if not record.feedback %}
+                    <div class="modal fade feedback-modal" id="feedbackModal-{{ record.id }}" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered custom-modal">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">
+                                        <i class="fas fa-comment-dots me-2"></i>
+                                        Add Feedback for {{ record.laboratory }}
+                                    </h5>
+                                </div>
+                                <form action="{{ url_for('submit_feedback') }}" method="POST" class="feedback-form">
+                                    <div class="modal-body">
+                                        <input type="hidden" name="history_id" value="{{ record.id }}">
+                                        <div class="session-details mb-4">
+                                            <div class="detail-item">
+                                                <span class="label">Date:</span>
+                                                <span class="value">{{ record.date }}</span>
+                                            </div>
+                                            <div class="detail-item">
+                                                <span class="label">Purpose:</span>
+                                                <span class="value">{{ record.sit_purpose }}</span>
+                                            </div>
+                                            <div class="detail-item">
+                                                <span class="label">Laboratory:</span>
+                                                <span class="value">{{ record.laboratory }}</span>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="feedback-{{ record.id }}" class="form-label">Your Feedback</label>
+                                            <textarea class="form-control feedback-textarea" 
+                                                    id="feedback-{{ record.id }}"
+                                                    name="feedback" 
+                                                    rows="4" 
+                                                    required
+                                                    placeholder="Please share your experience with this session..."></textarea>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                                        <button type="submit" class="btn btn-primary submit-feedback">
+                                            <i class="fas fa-paper-plane me-1"></i> Submit Feedback
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                {% endfor %}
             </div>
         </div>
     </div>
@@ -146,6 +217,186 @@
             padding: 10px;
         }
     }
+
+    .feedback-content {
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 6px;
+        border-left: 3px solid #4a3599;
+    }
+
+    .feedback-content p {
+        color: #2c3e50;
+        font-size: 0.9rem;
+    }
+
+    .feedback-content small {
+        font-size: 0.8rem;
+    }
+
+    .feedback-btn {
+        background: #4a3599;
+        border: none;
+        transition: all 0.3s ease;
+    }
+
+    .feedback-btn:hover {
+        background: #3a267a;
+        transform: translateY(-2px);
+    }
+
+    .feedback-textarea {
+        resize: vertical;
+        min-height: 100px;
+    }
+
+    .feedback-textarea:focus {
+        border-color: #4a3599;
+        box-shadow: 0 0 0 0.2rem rgba(74, 53, 153, 0.25);
+    }
+
+    /* Modal Styling */
+    .feedback-modal .modal-content {
+        border: none;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    .feedback-modal .modal-header {
+        background: #4a3599;
+        color: white;
+        border-bottom: none;
+        border-radius: 15px 15px 0 0;
+        padding: 1.5rem;
+    }
+
+    .feedback-modal .btn-close {
+        filter: brightness(0) invert(1);
+        opacity: 0.8;
+    }
+
+    .feedback-modal .modal-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+    }
+
+    .session-details {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .detail-item {
+        display: flex;
+        margin-bottom: 0.5rem;
+    }
+
+    .detail-item:last-child {
+        margin-bottom: 0;
+    }
+
+    .detail-item .label {
+        font-weight: 600;
+        min-width: 100px;
+        color: #4a5568;
+    }
+
+    .detail-item .value {
+        color: #2d3748;
+    }
+
+    .feedback-textarea {
+        border: 2px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 1rem;
+        resize: vertical;
+        min-height: 120px;
+        transition: all 0.3s ease;
+    }
+
+    .feedback-textarea:focus {
+        border-color: #4a3599;
+        box-shadow: 0 0 0 3px rgba(74, 53, 153, 0.1);
+    }
+
+    .feedback-modal .modal-footer {
+        border-top: 1px solid #e2e8f0;
+        padding: 1.25rem;
+    }
+
+    .submit-feedback {
+        background: #4a3599;
+        border: none;
+        padding: 0.5rem 1.5rem;
+        transition: all 0.3s ease;
+    }
+
+    .submit-feedback:hover {
+        background: #3a267a;
+        transform: translateY(-1px);
+    }
+
+    @media (max-width: 576px) {
+        .feedback-modal .modal-dialog {
+            margin: 0.5rem;
+        }
+    }
+
+    /* Enhanced Modal Styling */
+    .custom-modal {
+        max-width: 600px;
+        width: 95%;
+        margin: 1.75rem auto;
+    }
+
+    .feedback-modal .modal-content {
+        border: none;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .feedback-modal .modal-header {
+        background: #4a3599;
+        color: white;
+        border-bottom: none;
+        border-radius: 15px 15px 0 0;
+        padding: 1.25rem 1.5rem;
+    }
+
+    .feedback-modal .btn-close {
+        color: white;
+        opacity: 1;
+        text-shadow: none;
+        font-size: 1.5rem;
+    }
+
+    .feedback-modal .modal-body {
+        padding: 1.5rem;
+        background: white;
+    }
+
+    .feedback-modal .modal-footer {
+        padding: 1rem 1.5rem;
+        background: #f8f9fa;
+        border-top: 1px solid #edf2f7;
+    }
+
+    .session-details {
+        background: #f8f9fa;
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .feedback-textarea {
+        min-height: 150px;
+        padding: 1rem;
+        font-size: 1rem;
+        line-height: 1.5;
+    }
 </style>
 
 <script>
@@ -172,5 +423,65 @@
             tr[i].style.display = found ? "" : "none";
         }
     }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        var modals = document.querySelectorAll('.modal');
+        modals.forEach(function(modal) {
+            modal.addEventListener('show.bs.modal', function() {
+                console.log('Modal is showing:', modal.id);
+            });
+        });
+    });
+</script>
+
+<!-- Add these in the head section -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+<!-- Replace the existing scripts section at the bottom -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // Search functionality
+    function searchHistory() {
+        // ...existing search code...
+    }
+
+    // Initialize modals when the document is ready
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize all modals
+        var modals = document.querySelectorAll('.modal');
+        modals.forEach(function(modal) {
+            new bootstrap.Modal(modal);
+        });
+
+        // Add click handlers to feedback buttons
+        var feedbackButtons = document.querySelectorAll('.feedback-btn');
+        feedbackButtons.forEach(function(button) {
+            button.addEventListener('click', function() {
+                var modalId = this.getAttribute('data-bs-target');
+                var modal = document.querySelector(modalId);
+                var bsModal = bootstrap.Modal.getInstance(modal) || new bootstrap.Modal(modal);
+                bsModal.show();
+            });
+        });
+
+        // Handle form submission
+        var feedbackForms = document.querySelectorAll('.feedback-form');
+        feedbackForms.forEach(function(form) {
+            form.addEventListener('submit', function(e) {
+                var submitButton = form.querySelector('.submit-feedback');
+                var textarea = form.querySelector('.feedback-textarea');
+                
+                if (!textarea.value.trim()) {
+                    e.preventDefault();
+                    textarea.classList.add('is-invalid');
+                    return;
+                }
+                
+                submitButton.disabled = true;
+                submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+            });
+        });
+    });
 </script>
 {% endblock %}

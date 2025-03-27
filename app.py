@@ -455,9 +455,8 @@ def sit_in_history():
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Fetch sit-in history for the current user
     cursor.execute("""
-        SELECT date, sit_purpose, laboratory, login_time, logout_time
+        SELECT id, date, sit_purpose, laboratory, login_time, logout_time, feedback, action
         FROM sit_in_history
         WHERE id_number = ?
         ORDER BY date DESC, login_time DESC
@@ -467,6 +466,47 @@ def sit_in_history():
     conn.close()
     
     return render_template('sit_in_history.html', history=history)
+
+@app.route('/submit_feedback', methods=['POST'])
+@login_required
+def submit_feedback():
+    try:
+        history_id = request.form.get('history_id')
+        feedback = request.form.get('feedback')
+        user_id = session['user_id']
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        if not history_id or not feedback:
+            flash("Missing required information", "danger")
+            return redirect(url_for('sit_in_history'))
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Update feedback in sit_in_history table
+        cursor.execute("""
+            UPDATE sit_in_history 
+            SET feedback = ?,
+                feedback_date = ?
+            WHERE id = ? AND id_number = ?
+        """, (feedback, current_time, history_id, user_id))
+        
+        if cursor.rowcount > 0:
+            conn.commit()
+            flash("Thank you for your feedback!", "success")
+        else:
+            flash("Unable to submit feedback. Please try again.", "danger")
+            
+    except sqlite3.Error as e:
+        print(f"Database error: {str(e)}")
+        flash(f"Error submitting feedback. Please try again.", "danger")
+        if conn:
+            conn.rollback()
+    finally:
+        if conn:
+            conn.close()
+    
+    return redirect(url_for('sit_in_history'))
 
 @app.route('/reserve', methods=["GET", "POST"])
 @login_required
@@ -629,23 +669,34 @@ def end_session(idno):
             current_session = cursor.fetchone()
 
             if current_session:
-                # Update status in current_sit_in
+                # Insert into sit_in_history
+                cursor.execute("""
+                    INSERT INTO sit_in_history (
+                        id_number, name, sit_purpose, laboratory, 
+                        login_time, logout_time, date, action, feedback
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)
+                """, (
+                    idno,
+                    current_session['name'],
+                    current_session['purpose'],
+                    current_session['sit_lab'],
+                    current_time,
+                    current_time,
+                    datetime.now().strftime('%Y-%m-%d'),
+                    'Completed'
+                ))
+
+                # Update current_sit_in status
                 cursor.execute("""
                     UPDATE current_sit_in 
                     SET status = 'Completed' 
                     WHERE id_number = ? AND status = 'Active'
                 """, (idno,))
 
-                # Update logout_time in sit_in_records
+                # Update session count
                 cursor.execute("""
-                    UPDATE sit_in_records 
-                    SET logout_time = ?
-                    WHERE id_number = ? AND logout_time IS NULL
-                """, (current_time, idno))
-
-                # Deduct session count
-                cursor.execute("""
-                    UPDATE students SET session_count = MAX(session_count - 1, 0) 
+                    UPDATE students 
+                    SET session_count = MAX(session_count - 1, 0) 
                     WHERE idno = ?
                 """, (idno,))
 
@@ -1072,6 +1123,47 @@ def export_to_pdf(reports, start_date=None, end_date=None):
         as_attachment=True,
         download_name=f'sit_in_reports_{datetime.now().strftime("%Y%m%d")}.pdf'
     )
+
+@app.route('/feedback_reports')
+@admin_required
+def feedback_reports():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Enhanced query to get more detailed feedback information
+        query = """
+            SELECT 
+                h.id,
+                s.idno,
+                s.firstname,
+                s.lastname,
+                s.course,
+                s.year_level,
+                h.sit_purpose,
+                h.laboratory,
+                h.feedback,
+                h.date,
+                h.login_time,
+                h.logout_time,
+                h.feedback_date,
+                ROUND((julianday(h.logout_time) - julianday(h.login_time)) * 24, 1) as duration
+            FROM sit_in_history h
+            JOIN students s ON h.id_number = s.idno
+            WHERE h.feedback IS NOT NULL 
+            AND h.feedback != ''
+            ORDER BY h.feedback_date DESC
+        """
+        
+        cursor.execute(query)
+        feedbacks = cursor.fetchall()
+        
+        conn.close()
+        return render_template('admin/feedback_report.html',
+                             feedbacks=feedbacks)
+    except sqlite3.Error as e:
+        flash(f"Database error: {str(e)}", "danger")
+        return redirect(url_for('admin_dashboard'))
 
 @app.errorhandler(Exception)
 def handle_error(error):
