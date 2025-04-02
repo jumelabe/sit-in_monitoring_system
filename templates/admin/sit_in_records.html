@@ -113,9 +113,9 @@
                                 <th>Name</th>
                                 <th>Purpose</th>
                                 <th>Laboratory</th>
-                                <th>Login Time</th>
-                                <th>Logout Time</th>
-                                <th>Date</th>
+                                <th>Login Time & Date</th>
+                                <th>Logout Time & Date</th>
+                                <th>Status</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -127,7 +127,13 @@
                                 <td>{{ record.lab }}</td>
                                 <td>{{ record.login_time }}</td>
                                 <td>{{ record.logout_time }}</td>
-                                <td>{{ record.date }}</td>
+                                <td>
+                                    {% if record.logout_time == 'Active' %}
+                                        <span class="badge bg-success">Active</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Completed</span>
+                                    {% endif %}
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>

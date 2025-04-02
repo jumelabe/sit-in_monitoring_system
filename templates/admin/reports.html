@@ -118,38 +118,6 @@
 <div class="container-fluid px-4">
     <h1 class="mt-4">Generate Reports</h1>
 
-    <!-- Summary Statistics -->
-    <div class="row mb-4">
-        <div class="col-xl-3 col-md-6">
-            <div class="stats-card">
-                <h6>Total Records</h6>
-                <div class="stats-number">{{ total_records|default(0) }}</div>
-                <small class="text-muted">Total sit-in sessions recorded</small>
-            </div>
-        </div>
-        <div class="col-xl-3 col-md-6">
-            <div class="stats-card">
-                <h6>Unique Students</h6>
-                <div class="stats-number">{{ unique_students|default(0) }}</div>
-                <small class="text-muted">Different students who used the labs</small>
-            </div>
-        </div>
-        <div class="col-xl-3 col-md-6">
-            <div class="stats-card">
-                <h6>Most Active Lab</h6>
-                <div class="stats-number">{{ most_active_lab|default('N/A') }}</div>
-                <small class="text-muted">Laboratory with most visits</small>
-            </div>
-        </div>
-        <div class="col-xl-3 col-md-6">
-            <div class="stats-card">
-                <h6>Average Duration</h6>
-                <div class="stats-number">{{ avg_duration|default('0.0h') }}</div>
-                <small class="text-muted">Average time spent per session</small>
-            </div>
-        </div>
-    </div>
-
     <div class="card mb-4">
         <div class="card-header">
             <i class="fas fa-filter me-1"></i>
@@ -159,18 +127,6 @@
             <!-- Enhanced Filter Form -->
             <form class="mb-4" id="filterForm">
                 <div class="row">
-                    <div class="col-md-3">
-                        <div class="form-group">
-                            <label>Start Date:</label>
-                            <input type="date" name="start_date" class="form-control" value="{{ start_date }}">
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="form-group">
-                            <label>End Date:</label>
-                            <input type="date" name="end_date" class="form-control" value="{{ end_date }}">
-                        </div>
-                    </div>
                     <div id="dateError" class="date-error d-none">End date must be after start date</div>
                     <div class="col-md-3">
                         <div class="form-group">
@@ -198,7 +154,6 @@
                 <div class="row mt-3">
                     <div class="col-12">
                         <button type="submit" class="btn btn-primary">Apply Filters</button>
-                        <button type="reset" class="btn btn-secondary ms-2">Reset</button>
                     </div>
                 </div>
             </form>
@@ -326,24 +281,7 @@ $(document).ready(function() {
             infoFiltered: "(filtered from _MAX_ total entries)"
         },
         scrollX: true,
-        autoWidth: false,
-        columnDefs: [
-            {
-                targets: '_all',
-                render: function(data, type, row) {
-                    if (type === 'display' && data != null) {
-                        return data; // Remove truncation to show full content
-                    }
-                    return data;
-                }
-            }
-        ],
-        responsive: {
-            details: {
-                type: 'column',
-                target: 'tr'
-            }
-        }
+        autoWidth: false
     });
 
     // Form submission handling
@@ -357,7 +295,14 @@ $(document).ready(function() {
         const formData = new FormData(this);
         const searchParams = new URLSearchParams(formData);
 
-        fetch(`${window.location.pathname}?${searchParams.toString()}`, {
+        // Get the current URL and add the search parameters
+        const url = new URL(window.location.href);
+        for (const [key, value] of formData.entries()) {
+            url.searchParams.set(key, value);
+        }
+
+        // Fetch filtered data
+        fetch(url, {
             method: 'GET',
             headers: {
                 'Accept': 'application/json'
@@ -365,9 +310,14 @@ $(document).ready(function() {
         })
         .then(response => response.json())
         .then(data => {
+            // Clear and reload table
             table.clear();
-            table.rows.add(data.reports);
-            table.draw();
+            if (data.reports) {
+                table.rows.add(data.reports).draw();
+            }
+            
+            // Update URL without reloading page
+            window.history.pushState({}, '', url);
         })
         .catch(error => {
             console.error('Error:', error);
@@ -383,14 +333,6 @@ $(document).ready(function() {
         setTimeout(() => {
             $('#filterForm').submit();
         }, 0);
-    });
-
-    // Make DataTables responsive
-    $('#reportsTable').DataTable({
-        responsive: true,
-        scrollX: true,
-        autoWidth: false,
-        // ...existing DataTable options...
     });
 
     // Handle window resize
