@@ -6,26 +6,119 @@
 <div class="register-container">
   <div class="register-form">
     <h2>Create Account</h2>
-    <form method="POST" action="{{ url_for('register') }}">
-      <input type="text" name="student_id" id="student_id" class="form-control" placeholder="IDNO" required oninput="fillUsername()">
-      <input type="text" name="lastname" class="form-control" placeholder="Last Name" required>
-      <input type="text" name="firstname" class="form-control" placeholder="First Name" required>
-      <input type="text" name="middlename" class="form-control" placeholder="Middle Name">
-      <input type="text" name="course" class="form-control" placeholder="Course" required>
-      <input type="text" name="year_level" class="form-control" placeholder="Year level" required>
-      <input type="email" name="email" class="form-control" placeholder="Email Address" required>
-      <input type="text" name="username" id="username" class="form-control" placeholder="Username" required readonly> 
-      <input type="password" name="password" class="form-control" placeholder="Password" required>
-      <button type="submit" class="btn btn-gradient">Register</button>
-    </form>        
-    <p>If you already have an account, <a href="{{ url_for('login') }}">Sign In</a></p>
+    <form method="POST" action="{{ url_for('register') }}" onsubmit="return validateForm()">
+      <div class="form-grid">
+        <!-- Left Column -->
+        <div class="form-column">
+          <input type="text" name="student_id" id="student_id" class="form-control" placeholder="Student ID" 
+            pattern="[0-9]{8}" title="Must be an 8-digit number" required oninput="fillUsername()">
+          
+          <input type="text" name="lastname" class="form-control" placeholder="Last Name" 
+            pattern="[A-Za-z\s]+" title="Letters only" required>
+          
+          <input type="text" name="firstname" class="form-control" placeholder="First Name" 
+            pattern="[A-Za-z\s]+" title="Letters only" required>
+          
+          <input type="text" name="middlename" class="form-control" placeholder="Middle Name (Optional)" 
+            pattern="[A-Za-z\s]*" title="Letters only">
+          
+          <input type="email" name="email" class="form-control" placeholder="Email Address" 
+            pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$" required>
+        </div>
+        
+        <!-- Right Column -->
+        <div class="form-column">
+          <select class="form-control" name="course" required>
+            <option value="" disabled selected>Select Course</option>
+            <optgroup label="College of Computer Studies">
+              <option value="BSIT">BS Information Technology</option>
+              <option value="BSCS">BS Computer Science</option>
+              <option value="BSCPE">BS Computer Engineering</option>
+            </optgroup>
+            <optgroup label="College of Business">
+              <option value="BSBA">BS Business Administration</option>
+              <option value="BSA">BS Accountancy</option>
+              <option value="BSHM">BS Hospitality Management</option>
+            </optgroup>
+            <option value="BSC">BS Criminology</option>
+          </select>
+
+          <select class="form-control" name="year_level" required>
+            <option value="" disabled selected>Year Level</option>
+            <option value="1">1st Year</option>
+            <option value="2">2nd Year</option>
+            <option value="3">3rd Year</option>
+            <option value="4">4th Year</option>
+          </select>
+          
+          <input type="text" name="username" id="username" class="form-control" placeholder="Username" required readonly>
+          
+          <input type="password" name="password" id="password" class="form-control" placeholder="Password" 
+            pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}" required>
+          
+          <input type="password" name="confirm_password" id="confirm_password" class="form-control" 
+            placeholder="Confirm Password" required>
+        </div>
+      </div>
+
+      <div class="password-requirements-compact">
+        <span>Password Requirements: </span>
+        <span id="letter" class="invalid">lowercase</span> •
+        <span id="capital" class="invalid">uppercase</span> •
+        <span id="number" class="invalid">number</span> •
+        <span id="length" class="invalid">8+ chars</span>
+      </div>
+
+      <button type="submit" class="btn btn-gradient">Create Account</button>
+      <p class="login-link">Already have an account? <a href="{{ url_for('login') }}">Sign In</a></p>
+    </form>
   </div>   
 </div>
 
 <script>
-  function fillUsername() {
-    const studentId = document.getElementById('student_id').value;
-    document.getElementById('username').value = studentId;
+function fillUsername() {
+  const studentId = document.getElementById('student_id').value;
+  document.getElementById('username').value = studentId;
+}
+
+function validateForm() {
+  const password = document.getElementById('password').value;
+  const confirmPassword = document.getElementById('confirm_password').value;
+  
+  if (password !== confirmPassword) {
+    alert("Passwords do not match!");
+    return false;
   }
+  return true;
+}
+
+// Password validation
+const myInput = document.getElementById("password");
+const letter = document.getElementById("letter");
+const capital = document.getElementById("capital");
+const number = document.getElementById("number");
+const length = document.getElementById("length");
+
+myInput.onkeyup = function() {
+  const lowerCase = /[a-z]/g;
+  const upperCase = /[A-Z]/g;
+  const numbers = /[0-9]/g;
+  
+  // Validate lowercase letters
+  letter.classList.toggle("valid", myInput.value.match(lowerCase));
+  letter.classList.toggle("invalid", !myInput.value.match(lowerCase));
+  
+  // Validate capital letters
+  capital.classList.toggle("valid", myInput.value.match(upperCase));
+  capital.classList.toggle("invalid", !myInput.value.match(upperCase));
+
+  // Validate numbers
+  number.classList.toggle("valid", myInput.value.match(numbers));
+  number.classList.toggle("invalid", !myInput.value.match(numbers));
+
+  // Validate length
+  length.classList.toggle("valid", myInput.value.length >= 8);
+  length.classList.toggle("invalid", myInput.value.length < 8);
+}
 </script>
 {% endblock %}
