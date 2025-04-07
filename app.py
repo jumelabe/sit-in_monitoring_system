@@ -407,7 +407,7 @@ def update_logout():
     cursor = conn.cursor()
     
     try:
-        # Get current sit-in details before updating status
+        # Get current sit-in details
         cursor.execute("""
             SELECT name, purpose, sit_lab FROM current_sit_in 
             WHERE id_number = ? AND status = 'Active'
@@ -415,40 +415,41 @@ def update_logout():
         current_session = cursor.fetchone()
 
         if current_session:
-            # Update status in current_sit_in
+            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            current_date = datetime.now().strftime('%Y-%m-%d')
+            
+            # Insert into sit_in_history with all required fields
+            cursor.execute("""
+                INSERT INTO sit_in_history 
+                (id_number, name, sit_purpose, laboratory, login_time, logout_time, date, action)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                data['id_number'],
+                current_session['name'],
+                current_session['purpose'],
+                current_session['sit_lab'],
+                data.get('login_time', current_time),
+                current_time,
+                current_date,
+                'Completed'
+            ))
+            
+            # Update current_sit_in status
             cursor.execute("""
                 UPDATE current_sit_in 
                 SET status = 'Completed' 
                 WHERE id_number = ? AND status = 'Active'
             """, (data['id_number'],))
             
-            # Get the current time for logging
-            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            current_date = datetime.now().strftime('%Y-%m-%d')
-            
-            # Insert into sit_in_records
-            cursor.execute("""
-                INSERT INTO sit_in_records 
-                (id_number, name, purpose, lab, login_time, logout_time, date)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (
-                data['id_number'],
-                current_session['name'],
-                current_session['purpose'],
-                current_session['sit_lab'],
-                current_time,  # Using current time as login_time
-                data['logout_time'],
-                current_date
-            ))
-            
             # Update session count
-            cursor.execute("SELECT session_count FROM students WHERE idno = ?", (data['id_number'],))
-            session_count = cursor.fetchone()[0]
-            new_session_count = max(session_count - 1, 0)  # Deduct 1 hour or prevent going below 0
-            cursor.execute("UPDATE students SET session_count = ? WHERE idno = ?", (new_session_count, data['id_number']))
+            cursor.execute("""
+                UPDATE students 
+                SET session_count = MAX(session_count - 1, 0) 
+                WHERE idno = ?
+            """, (data['id_number'],))
             
             conn.commit()
-            return jsonify({"message": "Logout successful and record created"}), 200
+            return jsonify({"message": "Logout successful and history recorded"}), 200
         else:
             return jsonify({"message": "No active session found"}), 404
             
@@ -465,17 +466,39 @@ def sit_in_history():
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    cursor.execute("""
-        SELECT id, date, sit_purpose, laboratory, login_time, logout_time, feedback, action
-        FROM sit_in_history
-        WHERE id_number = ?
-        ORDER BY date DESC, login_time DESC
-    """, (user_id,))
-    
-    history = cursor.fetchall()
-    conn.close()
-    
-    return render_template('sit_in_history.html', history=history)
+    try:
+        # Query the history with all fields
+        cursor.execute("""
+            SELECT 
+                id,
+                id_number,
+                name,
+                sit_purpose,
+                laboratory,
+                strftime('%Y-%m-%d %H:%M', login_time) as login_time,
+                strftime('%Y-%m-%d %H:%M', logout_time) as logout_time,
+                date,
+                action,
+                feedback,
+                feedback_date
+            FROM sit_in_history
+            WHERE id_number = ?
+            ORDER BY date DESC, login_time DESC
+        """, (user_id,))
+        
+        history = cursor.fetchall()
+        
+        # Debug print
+        print(f"Found {len(history)} records for user {user_id}")
+        
+        return render_template('sit_in_history.html', history=history)
+        
+    except sqlite3.Error as e:
+        print(f"Database error in sit_in_history: {e}")
+        flash("Error loading history", "danger")
+        return redirect(url_for('dashboard'))
+    finally:
+        conn.close()
 
 @app.route('/submit_feedback', methods=['POST'])
 @login_required
@@ -501,11 +524,8 @@ def submit_feedback():
             WHERE id = ? AND id_number = ?
         """, (feedback, current_time, history_id, user_id))
         
-        if cursor.rowcount > 0:
-            conn.commit()
-            flash("Thank you for your feedback!", "success")
-        else:
-            flash("Unable to submit feedback. Please try again.", "danger")
+        conn.commit()
+        flash("Thank you for your feedback!", "success")
             
     except sqlite3.Error as e:
         print(f"Database error: {str(e)}")
@@ -671,24 +691,39 @@ def end_session(idno):
             cursor = conn.cursor()
             current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-            # Check if the student has an active sit-in session
+            # First get the active session details from sit_in_records
             cursor.execute("""
-                SELECT id_number, name, purpose, sit_lab, sit_id_number 
-                FROM current_sit_in 
-                WHERE id_number = ? AND status = 'Active'
+                SELECT id_number, name, purpose, lab, login_time, date
+                FROM sit_in_records 
+                WHERE id_number = ? AND logout_time IS NULL
             """, (idno,))
-            current_session = cursor.fetchone()
+            active_record = cursor.fetchone()
 
-            if current_session:
-                # First update the sit_in_records table
+            if active_record:
+                # Update sit_in_records with logout time
                 cursor.execute("""
                     UPDATE sit_in_records 
                     SET logout_time = ? 
-                    WHERE id_number = ? 
-                    AND logout_time IS NULL
+                    WHERE id_number = ? AND logout_time IS NULL
                 """, (current_time, idno))
 
-                # Then update current_sit_in status
+                # Insert into sit_in_history
+                cursor.execute("""
+                    INSERT INTO sit_in_history 
+                    (id_number, name, sit_purpose, laboratory, login_time, logout_time, date, action)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    active_record['id_number'],
+                    active_record['name'],
+                    active_record['purpose'],
+                    active_record['lab'],
+                    active_record['login_time'],
+                    current_time,
+                    active_record['date'],
+                    'Completed'
+                ))
+
+                # Update current_sit_in status
                 cursor.execute("""
                     UPDATE current_sit_in 
                     SET status = 'Completed' 

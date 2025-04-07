@@ -393,6 +393,7 @@
 </head>
 <body>
     <div class="dashboard-container">
+        <!-- Sidebar -->
         <div class="sidebar">
             <h1 class="dashboard-title">Student List</h1>
             <a href="{{ url_for('admin_dashboard') }}" class="menu-btn">Dashboard</a>
@@ -403,73 +404,75 @@
             <a href="{{ url_for('feedback_reports') }}" class="menu-btn">View Feedback</a>
             <a href="{{ url_for('logout') }}" class="menu-btn logout-btn">Logout</a>
         </div>
+
+        <!-- Main Content -->
         <div class="content">
             <div class="container">
+                <!-- Student List Section -->
                 <div class="student-list">
                     <div class="header-container">
                         <h2>List of Students</h2>
-                        <div class="search-container">
+                        <div class="search-container" style="display: flex; align-items: center; gap: 10px;">
                             <input type="text" id="searchInput" placeholder="Enter Student ID..." onkeydown="handleSearch(event)">
                             <button class="btn btn-primary" type="button" onclick="searchStudents()">Search</button>
+                            <button class="btn btn-warning" onclick="confirmResetAllSessions()">Reset All Sessions</button>
                         </div>
                     </div>
-                    <table class="table table-bordered table-hover" id="studentTable">
-                        <thead class="thead-dark">
-                            <tr>
-                                <th>ID Number</th>
-                                <th>First Name</th>
-                                <th>Middle Name</th>
-                                <th>Last Name</th>
-                                <th>Course</th>
-                                <th>Year Level</th>
-                                <th>Email Address</th>
-                                <th>Profile Picture</th>
-                                <th>Session Count</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for student in students %}
-                            <tr>
-                                <td>{{ student.idno }}</td>
-                                <td>{{ student.firstname }}</td>
-                                <td>{{ student.midname }}</td>
-                                <td>{{ student.lastname }}</td>
-                                <td>{{ student.course }}</td>
-                                <td>{{ student.year_level }}</td>
-                                <td>{{ student.email_address }}</td>
-                                <td>
-                                    {% if student.profile_picture %}
-                                    <img src="{{ url_for('static', filename=student.profile_picture) }}" alt="Profile Picture" class="profile-pic">
-                                    {% else %}
-                                    N/A
-                                    {% endif %}
-                                </td>
-                                <td>{{ student.session_count }}</td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="action-btn btn-remove" onclick="confirmDelete('{{ student.idno }}')" title="Remove Student">
-                                            <i class="fas fa-trash-alt"></i>
-                                        </button>
-                                        <button class="action-btn btn-reset" onclick="confirmResetSession('{{ student.idno }}')" title="Reset Session Count">
-                                            <i class="fas fa-redo-alt"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                    <div class="table-container" style="max-height: 500px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px;">
+                        <table class="table table-bordered table-hover mt-4" id="studentTable">
+                            <thead class="thead-dark">
+                                <tr>
+                                    <th>ID Number</th>
+                                    <th>First Name</th>
+                                    <th>Middle Name</th>
+                                    <th>Last Name</th>
+                                    <th>Course</th>
+                                    <th>Year Level</th>
+                                    <th>Email Address</th>
+                                    <th>Profile Picture</th>
+                                    <th>Session Count</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for student in students %}
+                                <tr>
+                                    <td>{{ student.idno }}</td>
+                                    <td>{{ student.firstname }}</td>
+                                    <td>{{ student.midname }}</td>
+                                    <td>{{ student.lastname }}</td>
+                                    <td>{{ student.course }}</td>
+                                    <td>{{ student.year_level }}</td>
+                                    <td>{{ student.email_address }}</td>
+                                    <td>
+                                        {% if student.profile_picture %}
+                                        <img src="{{ url_for('static', filename=student.profile_picture) }}" alt="Profile Picture" class="profile-pic">
+                                        {% else %}
+                                        N/A
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ student.session_count }}</td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="action-btn btn-remove" onclick="confirmDelete('{{ student.idno }}')" title="Remove Student">
+                                                <i class="fas fa-trash-alt"></i>
+                                            </button>
+                                            <button class="action-btn btn-reset" onclick="confirmResetSession('{{ student.idno }}')" title="Reset Session Count">
+                                                <i class="fas fa-redo-alt"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
-            <div class="text-center mt-3">
-                <button class="btn btn-warning" onclick="confirmResetAllSessions()">
-                    Reset All Sessions
-                </button>
             </div>
         </div>
     </div>
 
+    <!-- Modals -->
     <!-- Delete Confirmation Modal -->
     <div class="modal fade" id="deleteModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
         <div class="modal-dialog" role="document">
