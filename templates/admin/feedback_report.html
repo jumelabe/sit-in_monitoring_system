@@ -1,17 +1,17 @@
 {% extends "base.html" %}
 
-{% block title %}Feedback Reports{% endblock %}
+{% block title %}View Feedback{% endblock %}
 
 {% block content %}
 <div class="dashboard-container">
     <div class="sidebar">
-        <h1 class="dashboard-title">Feedback Reports</h1>
+        <h1 class="dashboard-title">View Feedback</h1>
         <a href="{{ url_for('admin_dashboard') }}" class="menu-btn">Dashboard</a>
         <a href="{{ url_for('student_list') }}" class="menu-btn">Student List</a>
         <a href="{{ url_for('current_sit_in') }}" class="menu-btn">Current Sit-in</a>
         <a href="{{ url_for('sit_in_records') }}" class="menu-btn">Sit-in Records</a>
         <a href="{{ url_for('reports') }}" class="menu-btn">Reports</a>
-        <a href="{{ url_for('feedback_reports') }}" class="menu-btn active">Feedback Reports</a>
+        <a href="{{ url_for('feedback_reports') }}" class="menu-btn active">View Feedback</a>
         <a href="{{ url_for('logout') }}" class="menu-btn logout-btn">Logout</a>
     </div>
 

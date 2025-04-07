@@ -280,9 +280,12 @@ def register():
             return redirect(url_for('register'))
 
         try:
+            # Set session count based on course
+            session_count = 30 if course in ['BSIT', 'BSCS'] else 15
+            
             cursor.execute(
                 'INSERT INTO students (idno, lastname, firstname, midname, course, year_level, email_address, username, password, session_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                (student_id, lastname, firstname, middlename, course, year_level, email, username, password, 30)  # Initialize session_count to 30 hours
+                (student_id, lastname, firstname, middlename, course, year_level, email, username, password, session_count)
             )
             conn.commit()
             flash("Registration successful! You can now log in.", "success")
@@ -541,7 +544,7 @@ def reserve():
 
             # Prevent reservations if session count is zero
             if remaining_session <= 0:
-                flash("You have no remaining session hours.", "danger")
+                flash("You have no remaining session.", "danger")
                 return redirect(url_for('reserve'))
 
             try:
@@ -748,6 +751,36 @@ def delete_announcement(id):
             cursor.close()
 
     return redirect(url_for('admin_dashboard'))
+
+@app.route('/delete_student/<student_id>', methods=['POST'])
+@admin_required
+def delete_student(student_id):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Delete student's profile picture if exists
+        cursor.execute("SELECT profile_picture FROM students WHERE idno = ?", (student_id,))
+        student = cursor.fetchone()
+        if student and student['profile_picture']:
+            profile_pic_path = os.path.join('static', student['profile_picture'])
+            if os.path.exists(profile_pic_path):
+                os.remove(profile_pic_path)
+
+        # Delete student's records from related tables
+        cursor.execute("DELETE FROM sit_in_records WHERE id_number = ?", (student_id,))
+        cursor.execute("DELETE FROM current_sit_in WHERE id_number = ?", (student_id,))
+        cursor.execute("DELETE FROM sit_in_history WHERE id_number = ?", (student_id,))
+        cursor.execute("DELETE FROM students WHERE idno = ?", (student_id,))
+        
+        conn.commit()
+        flash("Student removed successfully", "success")
+    except sqlite3.Error as e:
+        flash(f"Error removing student: {str(e)}", "danger")
+    finally:
+        conn.close()
+    
+    return redirect(url_for('student_list'))
 
 @app.route('/logout')
 def logout():
@@ -1167,6 +1200,56 @@ def feedback_reports():
     except sqlite3.Error as e:
         flash(f"Database error: {str(e)}", "danger")
         return redirect(url_for('admin_dashboard'))
+
+@app.route('/reset_session/<student_id>', methods=['POST'])
+@admin_required
+def reset_session(student_id):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Get student's course
+        cursor.execute("SELECT course FROM students WHERE idno = ?", (student_id,))
+        student = cursor.fetchone()
+        
+        if student:
+            # Set session count based on course
+            session_count = 30 if student['course'] in ['BSIT', 'BSCS'] else 15
+            cursor.execute("UPDATE students SET session_count = ? WHERE idno = ?", (session_count, student_id))
+            
+        conn.commit()
+        flash("Session count reset successfully", "success")
+    except sqlite3.Error as e:
+        flash(f"Error resetting session: {str(e)}", "danger")
+    finally:
+        conn.close()
+    
+    return redirect(url_for('student_list'))
+
+@app.route('/reset_all_sessions', methods=['POST'])
+@admin_required
+def reset_all_sessions():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Reset session counts based on course
+        cursor.execute("""
+            UPDATE students 
+            SET session_count = CASE 
+                WHEN course IN ('BSIT', 'BSCS') THEN 30 
+                ELSE 15 
+            END
+        """)
+        
+        conn.commit()
+        flash("All session counts reset successfully", "success")
+    except sqlite3.Error as e:
+        flash(f"Error resetting sessions: {str(e)}", "danger")
+    finally:
+        conn.close()
+    
+    return redirect(url_for('student_list'))
 
 @app.errorhandler(Exception)
 def handle_error(error):
