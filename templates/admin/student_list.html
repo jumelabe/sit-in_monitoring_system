@@ -24,7 +24,6 @@
             padding: 20px;
         }
 
-
         .student-list {
             background: #fff;
             padding: 30px;
@@ -43,8 +42,6 @@
             color: #333;
         }
     
-    
-    
         .edit-btn {
             display: block;
             margin: 10px auto;
@@ -62,8 +59,8 @@
         }
 
         .modal-header {
-            background-color: #4a3599;
-            color: white;
+            background-color: #ddd4fc;
+            color: #333;
             border-top-left-radius: 10px;
             border-top-right-radius: 10px;
             padding: 15px 20px;
@@ -78,12 +75,15 @@
         }
 
         .modal-footer .btn-primary {
-            background-color: #4a3599;
-            border: none;
+            background-color: #ddd4fc !important;
+            border: none !important;
+            color: #333 !important;
         }
 
         .modal-footer .btn-primary:hover {
-            background-color: #3a267a;
+            background-color: #c4b9f9 !important;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         }
 
         .modal-content {
@@ -185,7 +185,7 @@
         }
 
         .modal-header {
-            background: white;
+            background: #ddd4fc;
             padding: 20px 30px;
             border-bottom: 1px solid #eee;
         }
@@ -222,11 +222,12 @@
         }
 
         .modal-footer .btn-primary {
-            background: #2c3e50;
-            border: none;
+            background-color: #ddd4fc !important;
+            border: none !important;
         }
 
-        .modal-footer .btn:hover {
+        .modal-footer .btn-primary:hover {
+            background-color: #c4b9f9 !important;
             transform: translateY(-1px);
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         }
@@ -378,8 +379,8 @@
         }
 
         .btn-reset {
-            background-color: #ffc107;
-            color: #000;
+            background-color: #ddd4fc;
+            color: #333;
         }
 
         .btn-remove:hover {
@@ -387,7 +388,28 @@
         }
 
         .btn-reset:hover {
-            background-color: #e0a800;
+            background-color: #c4b9f9;
+            color: #333;
+        }
+
+        #resetAllSessionsModal .btn-warning {
+            background-color: #ddd4fc;
+            border: none;
+            color: #333;
+        }
+
+        #resetAllSessionsModal .btn-warning:hover {
+            background-color: #c4b9f9;
+        }
+
+        #resetSessionModal .btn-warning {
+            background-color: #ddd4fc;
+            border: none;
+            color: #333;
+        }
+
+        #resetSessionModal .btn-warning:hover {
+            background-color: #c4b9f9;
         }
     </style>
 </head>
@@ -414,8 +436,8 @@
                         <h2>List of Students</h2>
                         <div class="search-container" style="display: flex; align-items: center; gap: 10px;">
                             <input type="text" id="searchInput" placeholder="Enter Student ID..." onkeydown="handleSearch(event)">
-                            <button class="btn btn-primary" type="button" onclick="searchStudents()">Search</button>
-                            <button class="btn btn-warning" onclick="confirmResetAllSessions()">Reset All Sessions</button>
+                            <button class="btn btn-primary" type="button" onclick="searchStudents()" style="background-color: #4A3599; border: none;">Search</button>
+                            <button class="btn btn-primary" onclick="confirmResetAllSessions()" style="background-color: #4A3599; border: none;">Reset All Sessions</button>
                         </div>
                     </div>
                     <div class="table-container" style="max-height: 500px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px;">
