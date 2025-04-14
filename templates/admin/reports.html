@@ -138,6 +138,30 @@
             margin: 5px 0;
         }
     }
+
+    /* Add PDF-specific table styling */
+    .pdf-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 15px 0;
+    }
+    
+    .pdf-table th {
+        background-color: #4A3599;
+        color: white;
+        font-weight: bold;
+        padding: 10px;
+        border: 1px solid #ddd;
+    }
+    
+    .pdf-table td {
+        padding: 8px;
+        border: 1px solid #ddd;
+    }
+    
+    .pdf-table tr:nth-child(even) {
+        background-color: #f9f9f9;
+    }
 </style>
 {% endblock %}
 
@@ -201,30 +225,26 @@
                 </div>
             </form>
 
-            <!-- Export Section with Progress Bars -->
+            <!-- Export Section -->
             <div class="export-section">
                 <h6 class="mb-3">Export Options</h6>
                 <div class="d-flex flex-wrap">
-                    <button onclick="exportReport('csv')" class="btn btn-success btn-export" id="csvBtn">
+                    <a href="{{ url_for('export_reports', format='csv', lab=selected_lab, purpose=selected_purpose) }}" 
+                       class="btn btn-success btn-export">
                         <i class="fas fa-file-csv me-1"></i>
-                        <span class="btn-text">Export CSV</span>
-                        <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
-                    </button>
-                    <button onclick="exportReport('excel')" class="btn btn-success btn-export" id="excelBtn">
+                        Export CSV
+                    </a>
+                    <a href="{{ url_for('export_reports', format='excel', lab=selected_lab, purpose=selected_purpose) }}" 
+                       class="btn btn-success btn-export">
                         <i class="fas fa-file-excel me-1"></i>
-                        <span class="btn-text">Export Excel</span>
-                        <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
-                    </button>
-                    <button onclick="exportReport('pdf')" class="btn btn-success btn-export" id="pdfBtn">
+                        Export Excel
+                    </a>
+                    <a href="{{ url_for('export_reports', format='pdf', lab=selected_lab, purpose=selected_purpose) }}" 
+                       class="btn btn-success btn-export">
                         <i class="fas fa-file-pdf me-1"></i>
-                        <span class="btn-text">Export PDF</span>
-                        <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
-                    </button>
+                        Export PDF
+                    </a>
                 </div>
-                <div class="progress progress-bar-export d-none" id="exportProgress">
-                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
-                </div>
-                <div id="exportStatus" class="alert mt-3 d-none"></div>
             </div>
 
             <!-- Enhanced Reports Table -->
@@ -309,7 +329,108 @@ $(document).ready(function() {
                     'copy',
                     'csv',
                     'excel',
-                    'pdf',
+                    {
+                        extend: 'pdf',
+                        title: '',  // We'll create a custom header
+                        orientation: 'landscape',
+                        pageSize: 'A4',
+                        customize: function(doc) {
+                            // Add custom header
+                            doc.content.splice(0, 0, {
+                                margin: [0, 0, 0, 12],
+                                alignment: 'center',
+                                stack: [
+                                    {
+                                        text: 'SIT-IN MONITORING SYSTEM',
+                                        style: 'title',
+                                        fontSize: 18,
+                                        bold: true,
+                                        margin: [0, 0, 0, 8]
+                                    },
+                                    {
+                                        text: 'Generated Report',
+                                        style: 'subheader',
+                                        fontSize: 14,
+                                        margin: [0, 0, 0, 8]
+                                    },
+                                    {
+                                        text: `Report Period: ${new Date().toLocaleDateString()}`,
+                                        fontSize: 12,
+                                        margin: [0, 0, 0, 8]
+                                    }
+                                ]
+                            });
+
+                            // Set basic styles
+                            doc.defaultStyle = {
+                                fontSize: 10,
+                                font: 'helvetica'
+                            };
+
+                            // Custom table styling
+                            doc.styles.tableHeader = {
+                                fillColor: '#4A3599',
+                                color: 'white',
+                                fontSize: 11,
+                                bold: true,
+                                alignment: 'center',
+                                margin: [5, 5, 5, 5]
+                            };
+
+                            // Enhance table appearance
+                            doc.content[1].table.body.forEach(function(row, i) {
+                                row.forEach(function(cell) {
+                                    cell.margin = [5, 5, 5, 5];
+                                });
+                                if (i % 2 === 0) {
+                                    row.forEach(function(cell) {
+                                        cell.fillColor = '#f8f9fa';
+                                    });
+                                }
+                            });
+
+                            // Adjust column widths for better readability
+                            doc.content[1].table.widths = [
+                                '10%', // ID Number
+                                '20%', // Name
+                                '12%', // Purpose
+                                '10%', // Laboratory
+                                '12%', // Login Time
+                                '12%', // Logout Time
+                                '12%', // Duration
+                                '12%'  // Date
+                            ];
+
+                            // Add page numbers and timestamp to footer
+                            doc.footer = function(currentPage, pageCount) {
+                                return {
+                                    columns: [
+                                        {
+                                            text: `Generated on ${new Date().toLocaleString()}`,
+                                            alignment: 'left',
+                                            fontSize: 8,
+                                            margin: [40, 0]
+                                        },
+                                        {
+                                            text: `Page ${currentPage} of ${pageCount}`,
+                                            alignment: 'right',
+                                            fontSize: 8,
+                                            margin: [0, 0, 40, 0]
+                                        }
+                                    ],
+                                    margin: [0, 10]
+                                };
+                            };
+
+                            // Add metadata
+                            doc.info = {
+                                title: 'Sit-in Monitoring System Report',
+                                author: 'System Administrator',
+                                subject: 'Student Activity Report',
+                                keywords: 'sit-in, monitoring, student activities'
+                            };
+                        }
+                    },
                     'print'
                 ]
             }
@@ -406,72 +527,5 @@ $(document).on('click', function(e) {
         }
     }
 });
-
-// Enhanced export function
-async function exportReport(format) {
-    const btn = document.getElementById(`${format}Btn`);
-    const spinner = btn.querySelector('.spinner-border');
-    const btnText = btn.querySelector('.btn-text');
-    const statusDiv = document.getElementById('exportStatus');
-    
-    try {
-        // Get date range values
-        const startDate = document.querySelector('input[name="start_date"]').value;
-        const endDate = document.querySelector('input[name="end_date"]').value;
-        
-        // Disable button and show loading state
-        btn.disabled = true;
-        spinner.classList.remove('d-none');
-        btnText.textContent = `Exporting...`;
-        
-        // Build URL with parameters
-        const url = `/export_reports/${format}?start_date=${startDate}&end_date=${endDate}`;
-        
-        // Fetch the file
-        const response = await fetch(url);
-        
-        if (!response.ok) {
-            throw new Error(`Export failed: ${response.statusText}`);
-        }
-        
-        // Get the filename from the Content-Disposition header if available
-        const contentDisposition = response.headers.get('Content-Disposition');
-        const filename = contentDisposition ? 
-            contentDisposition.split('filename=')[1].replace(/"/g, '') : 
-            `sit_in_reports.${format}`;
-            
-        // Convert response to blob
-        const blob = await response.blob();
-        
-        // Create download link and trigger download
-        const downloadUrl = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = downloadUrl;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(downloadUrl);
-        document.body.removeChild(a);
-        
-        // Show success message
-        statusDiv.textContent = 'Export completed successfully!';
-        statusDiv.className = 'alert alert-success mt-3';
-        
-    } catch (error) {
-        console.error('Export error:', error);
-        statusDiv.textContent = `Export failed: ${error.message}`;
-        statusDiv.className = 'alert alert-danger mt-3';
-    } finally {
-        // Reset button state
-        btn.disabled = false;
-        spinner.classList.add('d-none');
-        btnText.textContent = `Export ${format.toUpperCase()}`;
-        
-        // Hide status message after 3 seconds
-        setTimeout(() => {
-            statusDiv.className = 'alert mt-3 d-none';
-        }, 3000);
-    }
-}
 </script>
 {% endblock %}

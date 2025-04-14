@@ -13,11 +13,12 @@ import pandas as pd
 from flask import send_file
 import platform
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter
+from reportlab.lib.pagesizes import letter, landscape, A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
+from reportlab.lib.utils import ImageReader
 
 app = Flask(__name__)
 app.secret_key = 'kaon aron di ma brother'  # Secret key for session management
@@ -861,10 +862,6 @@ def sit_in_records():
                 END as logout_time,
                 strftime('%Y-%m-%d', date) as date,
                 CASE 
-                    WHEN logout_time IS NOT NULL THEN 'Completed'
-                    ELSE 'Active'
-                END as status,
-                CASE 
                     WHEN login_time IS NOT NULL AND logout_time IS NOT NULL
                     THEN ROUND((julianday(logout_time) - julianday(login_time)) * 24, 1)
                     ELSE NULL
@@ -960,26 +957,16 @@ def reports():
 @admin_required
 def export_reports(format):
     try:
-        start_date = request.args.get('start_date')
-        end_date = request.args.get('end_date')
+        lab = request.args.get('lab', '')
+        purpose = request.args.get('purpose', '')
         
-        conn = get_db_connection()
-        if not conn:
-            flash("Database connection error", "danger")
-            return redirect(url_for('admin_dashboard'))
-            
-        cursor = conn.cursor()
-        
-        # Improved query with better date handling and duration calculation
+        # Build query with filters
         query = """
             SELECT 
-                id_number,
-                name,
-                purpose,
-                lab,
-                datetime(login_time) as login_time,
-                datetime(logout_time) as logout_time,
-                date,
+                id_number, name, purpose, lab,
+                strftime('%Y-%m-%d %H:%M', login_time) as login_time,
+                strftime('%Y-%m-%d %H:%M', logout_time) as logout_time,
+                strftime('%Y-%m-%d', date) as date,
                 CASE 
                     WHEN login_time IS NOT NULL AND logout_time IS NOT NULL
                     THEN ROUND((julianday(logout_time) - julianday(login_time)) * 24, 1)
@@ -990,210 +977,333 @@ def export_reports(format):
         """
         params = []
         
-        if start_date and end_date:
-            query += " AND date BETWEEN ? AND ?"
-            params.extend([start_date, end_date])
+        if lab:
+            query += " AND lab = ?"
+            params.append(lab)
+        if purpose:
+            query += " AND purpose = ?"
+            params.append(purpose)
             
         query += " ORDER BY date DESC, login_time DESC"
         
+        conn = get_db_connection()
+        cursor = conn.cursor()
         cursor.execute(query, params)
-        reports = [dict(row) for row in cursor.fetchall()]
+        reports = cursor.fetchall()
         conn.close()
 
         if not reports:
             flash("No data available for export", "warning")
             return redirect(url_for('reports'))
 
-        try:
-            if format == 'csv':
-                return export_to_csv(reports)
-            elif format == 'excel':
-                return export_to_excel(reports, start_date, end_date)
-            elif format == 'pdf':
-                return export_to_pdf(reports, start_date, end_date)
-            else:
-                flash("Invalid export format", "error")
-                return redirect(url_for('reports'))
-        except Exception as e:
-            flash(f"Export failed: {str(e)}", "error")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f'Sit-in_Monitoring_System_Report{timestamp}'
+
+        # Add filter info to filename
+        if lab or purpose:
+            filters = []
+            if lab: filters.append(f"lab_{lab}")
+            if purpose: filters.append(f"purpose_{purpose}")
+            filename += f"_{'_'.join(filters)}"
+
+        if format == 'csv':
+            return export_to_csv(reports, filename)
+        elif format == 'excel':
+            return export_to_excel(reports, filename)
+        elif format == 'pdf':
+            return export_to_pdf(reports, filename, lab=lab, purpose=purpose)
+        else:
+            flash("Invalid export format", "error")
             return redirect(url_for('reports'))
 
     except Exception as e:
         flash(f"Export error: {str(e)}", "error")
         return redirect(url_for('reports'))
 
-def export_to_csv(reports):
-    output = io.StringIO()
-    writer = csv.writer(output)
-    
-    writer.writerow(['ID Number', 'Name', 'Purpose', 'Laboratory', 
-                    'Login Time', 'Logout Time', 'Date', 'Duration (hours)'])
-    
-    for report in reports:
-        writer.writerow([
-            report['id_number'],
-            report['name'],
-            report['purpose'],
-            report['lab'],
-            report['login_time'],
-            report['logout_time'],
-            report['date'],
-            f"{report['duration']:.1f}" if report['duration'] else ''
-        ])
-    
-    response = make_response(output.getvalue())
-    response.headers['Content-Type'] = 'text/csv'
-    response.headers['Content-Disposition'] = f'attachment; filename=sit_in_reports_{datetime.now().strftime("%Y%m%d")}.csv'
-    return response
+def export_to_csv(reports, filename):
+    try:
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        writer.writerow(['ID Number', 'Name', 'Purpose', 'Laboratory', 
+                        'Login Time', 'Logout Time', 'Date', 'Duration (hours)'])
+        
+        for report in reports:
+            writer.writerow([
+                report['id_number'],
+                report['name'],
+                report['purpose'],
+                report['lab'],
+                report['login_time'],
+                report['logout_time'],
+                report['date'],
+                f"{report['duration']:.1f}" if report['duration'] else ''
+            ])
+        
+        output.seek(0)
+        return Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={
+                'Content-Disposition': f'attachment; filename={filename}.csv',
+                'Content-Type': 'text/csv; charset=utf-8'
+            }
+        )
+    except Exception as e:
+        raise Exception(f"CSV export failed: {str(e)}")
 
-def export_to_excel(reports, start_date=None, end_date=None):
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Sit-in Reports"
+def export_to_excel(reports, filename):
+    try:
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Computer Laboratory Sit-in Monitoring System Report"
+        
+        # Headers
+        headers = ['ID Number', 'Name', 'Purpose', 'Laboratory', 
+                  'Login Time', 'Logout Time', 'Date', 'Duration (hours)']
+        ws.append(headers)
+        
+        # Data
+        for report in reports:
+            ws.append([
+                report['id_number'],
+                report['name'],
+                report['purpose'],
+                report['lab'],
+                report['login_time'],
+                report['logout_time'],
+                report['date'],
+                f"{report['duration']:.1f}" if report['duration'] else ''
+            ])
+        
+        # Style the worksheet
+        for col in range(1, len(headers) + 1):
+            ws.column_dimensions[get_column_letter(col)].width = 15
+            
+        excel_file = io.BytesIO()
+        wb.save(excel_file)
+        excel_file.seek(0)
+        
+        return send_file(
+            excel_file,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=f'{filename}.xlsx'
+        )
+    except Exception as e:
+        raise Exception(f"Excel export failed: {str(e)}")
 
-    # Title and date range
-    ws.merge_cells('A1:H1')
-    ws['A1'] = "Sit-in Reports"
-    ws['A1'].font = Font(bold=True, size=14)
-    ws['A1'].alignment = Alignment(horizontal='center')
+def add_header_with_logos(canvas, doc):
+    # Save canvas state
+    canvas.saveState()
 
-    if start_date and end_date:
-        ws.merge_cells('A2:H2')
-        ws['A2'] = f"Period: {start_date} to {end_date}"
-        ws['A2'].alignment = Alignment(horizontal='center')
-        current_row = 3
-    else:
-        current_row = 2
+    # Define logo paths and sizes - slightly reduced
+    left_logo_path = 'static/images/uc_logo.jpg'
+    right_logo_path = 'static/images/css.png'
+    logo_width = 65  # Reduced size
+    logo_height = 65  # Reduced size
 
-    # Headers with styling
-    headers = ['ID Number', 'Name', 'Purpose', 'Laboratory', 
-              'Login Time', 'Logout Time', 'Date', 'Duration (hours)']
-    
-    for col, header in enumerate(headers, 1):
-        cell = ws.cell(row=current_row, column=col)
-        cell.value = header
-        cell.font = Font(bold=True)
-        cell.fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
-        cell.border = Border(
-            left=Side(style='thin'),
-            right=Side(style='thin'),
-            top=Side(style='thin'),
-            bottom=Side(style='thin')
+    # Check if logo files exist
+    if os.path.exists(left_logo_path) and os.path.exists(right_logo_path):
+        # Add left logo - adjusted position
+        canvas.drawImage(
+            left_logo_path,
+            doc.leftMargin,
+            doc.pagesize[1] - logo_height - 15,  # Adjusted position
+            width=logo_width,
+            height=logo_height,
+            preserveAspectRatio=True
         )
 
-    # Data
-    for row_idx, report in enumerate(reports, current_row + 1):
-        for col, value in enumerate([
-            report['id_number'],
-            report['name'],
-            report['purpose'],
-            report['lab'],
-            report['login_time'],
-            report['logout_time'],
-            report['date'],
-            f"{report['duration']:.1f}" if report['duration'] else ''
-        ], 1):
-            cell = ws.cell(row=row_idx, column=col)
-            cell.value = value
-            cell.border = Border(
-                left=Side(style='thin'),
-                right=Side(style='thin'),
-                top=Side(style='thin'),
-                bottom=Side(style='thin')
+        # Handle right logo with transparency
+        try:
+            right_logo = Image.open(right_logo_path)
+            if right_logo.mode != 'RGBA':
+                right_logo = right_logo.convert('RGBA')
+            
+            # Create a white background image
+            white_bg = Image.new('RGBA', right_logo.size, 'WHITE')
+            right_logo = Image.alpha_composite(white_bg, right_logo)
+            right_logo = right_logo.convert('RGB')
+            
+            temp_path = 'static/images/temp_right_logo.jpg'
+            right_logo.save(temp_path, 'JPEG', quality=95)
+            
+            # Draw right logo - adjusted position
+            canvas.drawImage(
+                temp_path,
+                doc.pagesize[0] - doc.rightMargin - logo_width - 10,
+                doc.pagesize[1] - logo_height - 15,  # Adjusted position
+                width=logo_width,
+                height=logo_height,
+                preserveAspectRatio=True
             )
+            
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+                
+        except Exception as e:
+            print(f"Error processing right logo: {e}")
 
-    # Auto-adjust column widths
-    for col in ws.columns:
-        max_length = 0
-        column = [cell for cell in col]
-        for cell in column:
-            try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
-            except:
-                pass
-        adjusted_width = (max_length + 2)
-        ws.column_dimensions[get_column_letter(column[0].column)].width = adjusted_width
-
-    # Save to BytesIO
-    excel_file = BytesIO()
-    wb.save(excel_file)
-    excel_file.seek(0)
-
-    return send_file(
-        excel_file,
-        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        as_attachment=True,
-        download_name=f'sit_in_reports_{datetime.now().strftime("%Y%m%d")}.xlsx'
+    # Add title section with adjusted spacing
+    canvas.setFont("Helvetica-Bold", 15)  # Slightly reduced font size
+    canvas.setFillColor(colors.HexColor('#4A3599'))
+    # Center the title text
+    title = "COMPUTER LABORATORY SIT-IN MONITORING SYSTEM REPORT"
+    title_width = canvas.stringWidth(title, "Helvetica-Bold", 15)
+    canvas.drawString(
+        (doc.pagesize[0] - title_width) / 2,
+        doc.pagesize[1] - 45,  # Adjusted position
+        title
     )
 
-def export_to_pdf(reports, start_date=None, end_date=None):
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=letter,
-        rightMargin=30,
-        leftMargin=30,
-        topMargin=30,
-        bottomMargin=18
-    )
-
-    elements = []
-    styles = getSampleStyleSheet()
-
-    # Title
-    elements.append(Paragraph("Sit-in Reports", styles['Title']))
-    elements.append(Spacer(1, 12))
-
-    # Date range and generation time
-    if start_date and end_date:
-        elements.append(Paragraph(f"Period: {start_date} to {end_date}", styles['Normal']))
-    elements.append(Paragraph(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
-    elements.append(Spacer(1, 12))
-
-    # Prepare table data
-    table_data = [['ID Number', 'Name', 'Purpose', 'Laboratory', 
-                   'Login Time', 'Logout Time', 'Date', 'Duration (hrs)']]
+    # Add page number and timestamp with adjusted positions
+    page_num = canvas.getPageNumber()
+    text = f"Page {page_num}"
+    canvas.setFont("Helvetica", 9)
+    canvas.setFillColor(colors.grey)
     
-    for report in reports:
-        table_data.append([
-            str(report['id_number']),
-            str(report['name']),
-            str(report['purpose']),
-            str(report['lab']),
-            str(report['login_time'] or ''),
-            str(report['logout_time'] or ''),
-            str(report['date']),
-            f"{report['duration']:.1f}" if report['duration'] else ''
-        ])
-
-    # Create and style the table
-    table = Table(table_data, repeatRows=1)
-    table.setStyle(TableStyle([
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,0), (-1,0), 10),
-        ('BOTTOMPADDING', (0,0), (-1,0), 12),
-        ('BACKGROUND', (0,0), (-1,0), colors.grey),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
-        ('FONTSIZE', (0,1), (-1,-1), 8),
-        ('GRID', (0,0), (-1,-1), 1, colors.black),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('WORDWRAP', (0,0), (-1,-1), True),
-    ]))
-
-    elements.append(table)
-    doc.build(elements)
-    buffer.seek(0)
-
-    return send_file(
-        buffer,
-        mimetype='application/pdf',
-        as_attachment=True,
-        download_name=f'sit_in_reports_{datetime.now().strftime("%Y%m%d")}.pdf'
+    # Footer content
+    canvas.drawRightString(
+        doc.pagesize[0] - doc.rightMargin,
+        doc.bottomMargin - 20,
+        text
     )
+    
+    canvas.drawString(
+        doc.leftMargin,
+        doc.bottomMargin - 20,
+        f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+    )
+
+    canvas.restoreState()
+
+def export_to_pdf(reports, filename, lab=None, purpose=None):
+    try:
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=landscape(A4),
+            rightMargin=40,  # Reduced margins
+            leftMargin=40,
+            topMargin=110,  # Reduced top margin
+            bottomMargin=40
+        )
+        
+        elements = []
+        styles = getSampleStyleSheet()
+        
+        # Reduced spacing after logos and title
+        elements.append(Spacer(1, 20))  # Reduced from 40
+        
+        # Add report info with center alignment
+        header_style = ParagraphStyle(
+            'CustomHeader',
+            parent=styles['Normal'],
+            fontSize=11,  # Slightly reduced font size
+            textColor=colors.grey,
+            alignment=1,
+            spaceAfter=10  # Reduced spacing
+        )
+        
+        elements.append(Paragraph(
+            f"Generated on: {datetime.now().strftime('%B %d, %Y %I:%M %p')}", 
+            header_style
+        ))
+        
+        # Add filters if present with reduced spacing
+        if lab or purpose:
+            filter_text = []
+            if lab: filter_text.append(f"Laboratory: {lab}")
+            if purpose: filter_text.append(f"Purpose: {purpose}")
+            elements.append(Paragraph(
+                "Filters: " + ", ".join(filter_text), 
+                header_style
+            ))
+        
+        elements.append(Spacer(1, 10))  # Reduced spacing
+        
+        # Create summary statistics with compact styling
+        total_duration = sum(r['duration'] or 0 for r in reports)
+        avg_duration = total_duration / len(reports) if reports else 0
+        
+        summary_data = [
+            ['Total Records:', str(len(reports))],
+            ['Total Hours:', f"{total_duration:.1f}"],
+            ['Average Duration:', f"{avg_duration:.1f} hours"]
+        ]
+        
+        summary_table = Table(summary_data, colWidths=[90, 90])  # Reduced widths
+        summary_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),  # Reduced font size
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.grey),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),  # Reduced padding
+        ]))
+        
+        elements.append(summary_table)
+        elements.append(Spacer(1, 10))  # Reduced spacing
+        
+        # Create main table data
+        data = [['ID Number', 'Name', 'Purpose', 'Laboratory', 
+                 'Login Time', 'Logout Time', 'Date', 'Duration']]
+        
+        for report in reports:
+            data.append([
+                report['id_number'],
+                report['name'],
+                report['purpose'],
+                report['lab'],
+                report['login_time'],
+                report['logout_time'],
+                report['date'],
+                f"{report['duration']:.1f} hrs" if report['duration'] else 'N/A'
+            ])
+        
+        # Create and style the main table
+        table = Table(data, repeatRows=1)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4A3599')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 11),  # Increased font size
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 10),  # Increased font size
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 15),  # Increased padding
+            ('TOPPADDING', (0, 0), (-1, -1), 8),    # Added top padding
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 8),  # Added bottom padding
+            ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+            ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]))
+
+        # Calculate column widths based on content
+        col_widths = ['10%', '20%', '15%', '12%', '13%', '13%', '10%', '7%']
+        table._argW = [doc.width * float(width.strip('%'))/100 for width in col_widths]
+        
+        elements.append(table)
+        
+        # Build the PDF with new header function
+        doc.build(
+            elements,
+            onFirstPage=add_header_with_logos,
+            onLaterPages=add_header_with_logos
+        )
+        
+        buffer.seek(0)
+        return send_file(
+            buffer,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=f'{filename}.pdf'
+        )
+    except Exception as e:
+        raise Exception(f"PDF export failed: {str(e)}")
 
 @app.route('/feedback_reports')
 @admin_required
@@ -1295,5 +1405,5 @@ def handle_error(error):
     return redirect(url_for('login'))
 
 if __name__ == '__main__':
-    app.run(debug=True)
-    # app.run(debug=True, host='172.19.131.164', port=5000)
+    # app.run(debug=True)
+    app.run(debug=True, host='172.19.131.164', port=5000)
