@@ -1405,5 +1405,5 @@ def handle_error(error):
     return redirect(url_for('login'))
 
 if __name__ == '__main__':
-    # app.run(debug=True)
-    app.run(debug=True, host='172.19.131.164', port=5000)
+    app.run(debug=True)
+    # app.run(debug=True, host='192.168.254.199', port=5000)
