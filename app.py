@@ -959,7 +959,8 @@ def export_reports(format):
     try:
         lab = request.args.get('lab', '')
         purpose = request.args.get('purpose', '')
-        
+        paper_size = request.args.get('paper_size', 'short')  # Add this line to get paper_size
+
         # Build query with filters
         query = """
             SELECT 
@@ -1011,7 +1012,7 @@ def export_reports(format):
         elif format == 'excel':
             return export_to_excel(reports, filename)
         elif format == 'pdf':
-            return export_to_pdf(reports, filename, lab=lab, purpose=purpose)
+            return export_to_pdf(reports, filename, lab=lab, purpose=purpose, paper_size=paper_size)
         else:
             flash("Invalid export format", "error")
             return redirect(url_for('reports'))
@@ -1097,31 +1098,30 @@ def add_header_with_logos(canvas, doc):
     # Save canvas state
     canvas.saveState()
 
-    # Define logo paths and sizes - slightly reduced
+    # Define logo paths and sizes
     left_logo_path = 'static/images/uc_logo.jpg'
     right_logo_path = 'static/images/css.png'
-    logo_width = 65  # Reduced size
-    logo_height = 65  # Reduced size
+    logo_width = 65
+    logo_height = 65
 
-    # Check if logo files exist
+    # Add logos if they exist
     if os.path.exists(left_logo_path) and os.path.exists(right_logo_path):
-        # Add left logo - adjusted position
+        # Add left logo (UC Logo)
         canvas.drawImage(
             left_logo_path,
             doc.leftMargin,
-            doc.pagesize[1] - logo_height - 15,  # Adjusted position
+            doc.pagesize[1] - logo_height - 15,
             width=logo_width,
             height=logo_height,
             preserveAspectRatio=True
         )
 
-        # Handle right logo with transparency
+        # Handle right logo (CSS Logo) with transparency
         try:
             right_logo = Image.open(right_logo_path)
             if right_logo.mode != 'RGBA':
                 right_logo = right_logo.convert('RGBA')
             
-            # Create a white background image
             white_bg = Image.new('RGBA', right_logo.size, 'WHITE')
             right_logo = Image.alpha_composite(white_bg, right_logo)
             right_logo = right_logo.convert('RGB')
@@ -1129,11 +1129,10 @@ def add_header_with_logos(canvas, doc):
             temp_path = 'static/images/temp_right_logo.jpg'
             right_logo.save(temp_path, 'JPEG', quality=95)
             
-            # Draw right logo - adjusted position
             canvas.drawImage(
                 temp_path,
                 doc.pagesize[0] - doc.rightMargin - logo_width - 10,
-                doc.pagesize[1] - logo_height - 15,  # Adjusted position
+                doc.pagesize[1] - logo_height - 15,
                 width=logo_width,
                 height=logo_height,
                 preserveAspectRatio=True
@@ -1145,29 +1144,43 @@ def add_header_with_logos(canvas, doc):
         except Exception as e:
             print(f"Error processing right logo: {e}")
 
-    # Add title section with adjusted spacing
-    canvas.setFont("Helvetica-Bold", 15)  # Slightly reduced font size
+    # Add header text
+    canvas.setFont("Helvetica-Bold", 16)
     canvas.setFillColor(colors.HexColor('#4A3599'))
-    # Center the title text
-    title = "COMPUTER LABORATORY SIT-IN MONITORING SYSTEM REPORT"
-    title_width = canvas.stringWidth(title, "Helvetica-Bold", 15)
+    
+    # Center all text elements
+    title_width = canvas.stringWidth("University of Cebu-Main Campus", "Helvetica-Bold", 16)
     canvas.drawString(
         (doc.pagesize[0] - title_width) / 2,
-        doc.pagesize[1] - 45,  # Adjusted position
-        title
+        doc.pagesize[1] - 45,
+        "University of Cebu-Main Campus"
     )
 
-    # Add page number and timestamp with adjusted positions
-    page_num = canvas.getPageNumber()
-    text = f"Page {page_num}"
+    canvas.setFont("Helvetica-Bold", 14)
+    subtitle_width = canvas.stringWidth("College of Computer Studies", "Helvetica-Bold", 14)
+    canvas.drawString(
+        (doc.pagesize[0] - subtitle_width) / 2,
+        doc.pagesize[1] - 65,
+        "College of Computer Studies"
+    )
+
+    canvas.setFont("Helvetica-Bold", 12)
+    report_title_width = canvas.stringWidth("Computer Laboratory Sit-In Monitoring System Report", "Helvetica-Bold", 12)
+    canvas.drawString(
+        (doc.pagesize[0] - report_title_width) / 2,
+        doc.pagesize[1] - 85,
+        "Computer Laboratory Sit-In Monitoring System Report"
+    )
+
+    # Footer content
     canvas.setFont("Helvetica", 9)
     canvas.setFillColor(colors.grey)
     
-    # Footer content
+    page_num = canvas.getPageNumber()
     canvas.drawRightString(
         doc.pagesize[0] - doc.rightMargin,
         doc.bottomMargin - 20,
-        text
+        f"Page {page_num}"
     )
     
     canvas.drawString(
@@ -1178,40 +1191,47 @@ def add_header_with_logos(canvas, doc):
 
     canvas.restoreState()
 
-def export_to_pdf(reports, filename, lab=None, purpose=None):
+def export_to_pdf(reports, filename, lab=None, purpose=None, paper_size='short'):
     try:
         buffer = io.BytesIO()
+        
+        # Define paper sizes in points (1 inch = 72 points)
+        paper_sizes = {
+            'short': (612, 792),     # 8.5" x 11"
+            'long': (612, 936),      # 8.5" x 13"
+            'a4': (595, 842)         # 210mm x 297mm
+        }
+        
+        # Get the pagesize or default to short bond paper
+        pagesize = paper_sizes.get(paper_size, paper_sizes['short'])
+
+        # Create the PDF document with landscape orientation
         doc = SimpleDocTemplate(
             buffer,
-            pagesize=landscape(A4),
-            rightMargin=40,  # Reduced margins
-            leftMargin=40,
-            topMargin=110,  # Reduced top margin
-            bottomMargin=40
+            pagesize=pagesize,
+            rightMargin=25,  # Reduced margins
+            leftMargin=25,
+            topMargin=100,
+            bottomMargin=25
         )
         
         elements = []
         styles = getSampleStyleSheet()
         
         # Reduced spacing after logos and title
-        elements.append(Spacer(1, 20))  # Reduced from 40
+        elements.append(Spacer(1, 15))
         
         # Add report info with center alignment
         header_style = ParagraphStyle(
             'CustomHeader',
             parent=styles['Normal'],
-            fontSize=11,  # Slightly reduced font size
+            fontSize=9,
             textColor=colors.grey,
             alignment=1,
-            spaceAfter=10  # Reduced spacing
+            spaceAfter=8
         )
         
-        elements.append(Paragraph(
-            f"Generated on: {datetime.now().strftime('%B %d, %Y %I:%M %p')}", 
-            header_style
-        ))
-        
-        # Add filters if present with reduced spacing
+        # Add filters if present
         if lab or purpose:
             filter_text = []
             if lab: filter_text.append(f"Laboratory: {lab}")
@@ -1221,74 +1241,65 @@ def export_to_pdf(reports, filename, lab=None, purpose=None):
                 header_style
             ))
         
-        elements.append(Spacer(1, 10))  # Reduced spacing
+        elements.append(Spacer(1, 8))
         
-        # Create summary statistics with compact styling
-        total_duration = sum(r['duration'] or 0 for r in reports)
-        avg_duration = total_duration / len(reports) if reports else 0
-        
-        summary_data = [
-            ['Total Records:', str(len(reports))],
-            ['Total Hours:', f"{total_duration:.1f}"],
-            ['Average Duration:', f"{avg_duration:.1f} hours"]
+        # Adjust column widths proportionally
+        available_width = doc.width
+        col_widths = [
+            available_width * 0.12,  # ID Number
+            available_width * 0.18,  # Name
+            available_width * 0.15,  # Purpose
+            available_width * 0.12,  # Laboratory
+            available_width * 0.15,  # Login Time
+            available_width * 0.15,  # Logout Time
+            available_width * 0.13   # Duration
         ]
         
-        summary_table = Table(summary_data, colWidths=[90, 90])  # Reduced widths
-        summary_table.setStyle(TableStyle([
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 9),  # Reduced font size
-            ('TEXTCOLOR', (0, 0), (-1, -1), colors.grey),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),  # Reduced padding
-        ]))
-        
-        elements.append(summary_table)
-        elements.append(Spacer(1, 10))  # Reduced spacing
-        
-        # Create main table data
+        # Create main table data with word wrapping
         data = [['ID Number', 'Name', 'Purpose', 'Laboratory', 
-                 'Login Time', 'Logout Time', 'Date', 'Duration']]
+                 'Login Time', 'Logout Time', 'Duration']]
         
         for report in reports:
+            # Wrap long text entries
+            name = Paragraph(report['name'], ParagraphStyle('Normal', fontSize=8))
+            purpose = Paragraph(report['purpose'], ParagraphStyle('Normal', fontSize=8))
+            
             data.append([
-                report['id_number'],
-                report['name'],
-                report['purpose'],
-                report['lab'],
-                report['login_time'],
-                report['logout_time'],
-                report['date'],
-                f"{report['duration']:.1f} hrs" if report['duration'] else 'N/A'
+                Paragraph(str(report['id_number']), ParagraphStyle('Normal', fontSize=8)),
+                name,
+                purpose,
+                Paragraph(report['lab'], ParagraphStyle('Normal', fontSize=8)),
+                Paragraph(report['login_time'], ParagraphStyle('Normal', fontSize=8)),
+                Paragraph(report['logout_time'], ParagraphStyle('Normal', fontSize=8)),
+                Paragraph(f"{report['duration']:.1f} hrs" if report['duration'] else 'N/A', 
+                         ParagraphStyle('Normal', fontSize=8))
             ])
         
-        # Create and style the main table
-        table = Table(data, repeatRows=1)
+        # Create and style the table with improved formatting
+        table = Table(data, colWidths=col_widths, repeatRows=1)
         table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4A3599')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 11),  # Increased font size
-            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 1), (-1, -1), 10),  # Increased font size
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 15),  # Increased padding
-            ('TOPPADDING', (0, 0), (-1, -1), 8),    # Added top padding
-            ('BOTTOMPADDING', (0, 1), (-1, -1), 8),  # Added bottom padding
+            ('FONTSIZE', (0, 0), (-1, 0), 9),  # Header font size
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            ('TOPPADDING', (0, 0), (-1, 0), 8),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 5),
+            ('TOPPADDING', (0, 1), (-1, -1), 5),
+            ('LEFTPADDING', (0, 0), (-1, -1), 4),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
             ('BACKGROUND', (0, 1), (-1, -1), colors.white),
             ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEADING', (0, 0), (-1, -1), 8),  # Reduced line spacing
         ]))
-
-        # Calculate column widths based on content
-        col_widths = ['10%', '20%', '15%', '12%', '13%', '13%', '10%', '7%']
-        table._argW = [doc.width * float(width.strip('%'))/100 for width in col_widths]
         
         elements.append(table)
         
-        # Build the PDF with new header function
+        # Build the PDF
         doc.build(
             elements,
             onFirstPage=add_header_with_logos,
