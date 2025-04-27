@@ -88,18 +88,19 @@
     <div class="dashboard-container">
         <div class="sidebar">
             <h1 class="dashboard-title">Sit-in Records</h1>
-            <a href="{{ url_for('admin_dashboard') }}" class="menu-btn">Dashboard</a>
-            <a href="{{ url_for('student_list') }}" class="menu-btn">Student List</a>
-            <a href="{{ url_for('current_sit_in') }}" class="menu-btn">Current Sit-in</a>
-            <a href="{{ url_for('sit_in_records') }}" class="menu-btn active">Sit-in Records</a>
-            <a href="{{ url_for('reports') }}" class="menu-btn">Reports</a>
-            <a href="{{ url_for('feedback_reports') }}" class="menu-btn">View Feedback</a>
-            <a href="{{ url_for('logout') }}" class="menu-btn logout-btn">Logout</a>
+            <a href="{{ url_for('admin.admin_dashboard') }}" class="menu-btn">Dashboard</a>
+            <a href="{{ url_for('admin.student_list') }}" class="menu-btn">Student List</a>
+            <a href="{{ url_for('admin.current_sit_in') }}" class="menu-btn">Current Sit-in</a>
+            <a href="{{ url_for('admin.sit_in_records') }}" class="menu-btn active">Sit-in Records</a>
+            <a href="{{ url_for('admin.reports') }}" class="menu-btn">Reports</a>
+            <a href="{{ url_for('admin.feedback_reports') }}" class="menu-btn">View Feedback</a>
+            <a href="{{ url_for('admin.leaderboards') }}" class="menu-btn">Leaderboards</a>
+            <a href="{{ url_for('admin.logout') }}" class="menu-btn logout-btn">Logout</a>
         </div>
         
         <div class="content">
             <div class="container mt-4">
-                <div class="header-container">
+                                <div class="header-container">
                     <h2>Sit-in Records</h2>
                     <div class="search-container">
                         <input type="text" class="search-input" placeholder="Search records..." id="searchInput" onkeyup="searchTable()">

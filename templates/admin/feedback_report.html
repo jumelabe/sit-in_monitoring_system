@@ -6,13 +6,14 @@
 <div class="dashboard-container">
     <div class="sidebar">
         <h1 class="dashboard-title">View Feedback</h1>
-        <a href="{{ url_for('admin_dashboard') }}" class="menu-btn">Dashboard</a>
-        <a href="{{ url_for('student_list') }}" class="menu-btn">Student List</a>
-        <a href="{{ url_for('current_sit_in') }}" class="menu-btn">Current Sit-in</a>
-        <a href="{{ url_for('sit_in_records') }}" class="menu-btn">Sit-in Records</a>
-        <a href="{{ url_for('reports') }}" class="menu-btn">Reports</a>
-        <a href="{{ url_for('feedback_reports') }}" class="menu-btn active">View Feedback</a>
-        <a href="{{ url_for('logout') }}" class="menu-btn logout-btn">Logout</a>
+        <a href="{{ url_for('admin.admin_dashboard') }}" class="menu-btn">Dashboard</a>
+        <a href="{{ url_for('admin.student_list') }}" class="menu-btn">Student List</a>
+        <a href="{{ url_for('admin.current_sit_in') }}" class="menu-btn">Current Sit-in</a>
+        <a href="{{ url_for('admin.sit_in_records') }}" class="menu-btn">Sit-in Records</a>
+        <a href="{{ url_for('admin.reports') }}" class="menu-btn">Reports</a>
+        <a href="{{ url_for('admin.feedback_reports') }}" class="menu-btn active">View Feedback</a>
+        <a href="{{ url_for('admin.leaderboards') }}" class="menu-btn">Leaderboards</a>
+        <a href="{{ url_for('admin.logout') }}" class="menu-btn logout-btn">Logout</a>
     </div>
 
     <div class="content">
@@ -24,18 +25,10 @@
 
             <!-- Filter Section -->
             <div class="filter-card mb-4">
-                <form method="get" class="row g-3">
-                    <div class="col-md-3">
-                        <label class="form-label">Date From</label>
-                        <input type="date" class="custom-input" name="date_from" value="{{ date_from }}">
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">Date To</label>
-                        <input type="date" class="custom-input" name="date_to" value="{{ date_to }}">
-                    </div>
-                    <div class="col-md-4">
+                <form id="filterForm" class="row g-3">
+                    <div class="col-md-10">
                         <label class="form-label">Laboratory</label>
-                        <select class="custom-select" name="lab">
+                        <select class="custom-select" name="lab" id="labFilter">
                             <option value="">All Laboratories</option>
                             {% for lab in laboratories %}
                             <option value="{{ lab }}" {% if lab == selected_lab %}selected{% endif %}>{{ lab }}</option>
@@ -50,63 +43,9 @@
                 </form>
             </div>
 
-            {% if feedbacks %}
-            <div class="sort-controls mb-3">
-                <select class="form-select" id="sortBy" onchange="sortFeedbacks(this.value)">
-                    <option value="date-desc">Date (Newest First)</option>
-                    <option value="date-asc">Date (Oldest First)</option>
-                    <option value="lab">Laboratory</option>
-                    <option value="name">Student Name</option>
-                </select>
+            <div id="feedbackGrid" class="feedback-grid">
+                <!-- Feedback cards will be dynamically loaded here -->
             </div>
-
-            <div class="feedback-grid" id="feedbackGrid">
-                {% for feedback in feedbacks %}
-                <div class="feedback-card">
-                    <div class="feedback-header">
-                        <div class="student-info">
-                            <h4>{{ feedback.firstname }} {{ feedback.lastname }}</h4>
-                            <div class="student-details">
-                                <span class="student-id">ID: {{ feedback.idno }}</span>
-                                <span class="course-year">{{ feedback.course }} - Year {{ feedback.year_level }}</span>
-                            </div>
-                        </div>
-                        <div class="session-info">
-                            <span class="lab-badge">{{ feedback.laboratory }}</span>
-                            <div class="time-details">
-                                <div class="time-item">
-                                    <i class="fas fa-calendar"></i>
-                                    <span>{{ feedback.date }}</span>
-                                </div>
-                                <div class="time-item">
-                                    <i class="fas fa-clock"></i>
-                                    <span>{{ feedback.duration }}h</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="feedback-content">
-                        <div class="purpose">
-                            <strong>Purpose:</strong> {{ feedback.sit_purpose }}
-                        </div>
-                        <div class="feedback-text">
-                            {{ feedback.feedback }}
-                        </div>
-                        <div class="feedback-meta">
-                            <small>
-                                <i class="fas fa-comment-dots"></i>
-                                Submitted: {{ feedback.feedback_date }}
-                            </small>
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <div class="alert alert-info">
-                No feedback reports available.
-            </div>
-            {% endif %}
         </div>
     </div>
 </div>
@@ -237,22 +176,91 @@
 </style>
 
 <script>
-function sortFeedbacks(criteria) {
-    const grid = document.getElementById('feedbackGrid');
-    const cards = Array.from(grid.getElementsByClassName('feedback-card'));
-    
-    cards.sort((a, b) => {
-        const aValue = a.dataset[criteria.split('-')[0]];
-        const bValue = b.dataset[criteria.split('-')[0]];
-        
-        if (criteria.endsWith('-desc')) {
-            return bValue.localeCompare(aValue);
-        }
-        return aValue.localeCompare(bValue);
-    });
-    
-    cards.forEach(card => grid.appendChild(card));
+// Add this debug function
+function debug(message, data) {
+    console.log(message, data);
 }
+
+document.getElementById('labFilter').addEventListener('change', function(e) {
+    filterFeedbacks();
+});
+
+document.getElementById('filterForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    filterFeedbacks();
+});
+
+function filterFeedbacks() {
+    const lab = document.getElementById('labFilter').value;
+    const url = new URL(window.location.href);
+    url.searchParams.set('lab', lab);
+    
+    debug('Filtering for lab:', lab);
+
+    fetch(url, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        debug('Received data:', data);
+        
+        const grid = document.getElementById('feedbackGrid');
+        grid.innerHTML = '';
+        
+        if (!data.feedbacks || data.feedbacks.length === 0) {
+            grid.innerHTML = '<div class="alert alert-info">No feedback reports available for this laboratory.</div>';
+            return;
+        }
+        
+        data.feedbacks.forEach(feedback => {
+            grid.innerHTML += `
+                <div class="feedback-card">
+                    <div class="feedback-header">
+                        <div class="student-info">
+                            <h4>${feedback.name}</h4>
+                            <div class="student-details">
+                                <span class="student-id">ID: ${feedback.id_number}</span>
+                            </div>
+                        </div>
+                        <div class="session-info">
+                            <span class="lab-badge">${feedback.laboratory}</span>
+                            <div class="time-details">
+                                <div class="time-item">
+                                    <i class="fas fa-calendar"></i>
+                                    <span>${feedback.date}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="feedback-content">
+                        <div class="purpose">
+                            <strong>Purpose:</strong> ${feedback.sit_purpose}
+                        </div>
+                        <div class="feedback-text">
+                            ${feedback.feedback}
+                        </div>
+                        <div class="feedback-meta">
+                            <small>
+                                <i class="fas fa-comment-dots"></i>
+                                Submitted: ${feedback.feedback_date}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        const grid = document.getElementById('feedbackGrid');
+        grid.innerHTML = '<div class="alert alert-danger">Error loading feedback reports.</div>';
+    });
+}
+
+// Initial load
+window.addEventListener('DOMContentLoaded', filterFeedbacks);
 </script>
 
 <link rel="stylesheet" href="{{ url_for('static', filename='css/feedback.css') }}">

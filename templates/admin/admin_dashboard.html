@@ -598,13 +598,14 @@
     <div class="dashboard-container">
         <div class="sidebar">
             <h1 class="dashboard-title">Admin Dashboard</h1>
-            <a href="{{ url_for('admin_dashboard') }}" class="menu-btn active">Dashboard</a>
-            <a href="{{ url_for('student_list') }}" class="menu-btn">Student List</a>
-            <a href="{{ url_for('current_sit_in') }}" class="menu-btn">Current Sit-in</a>
-            <a href="{{ url_for('sit_in_records') }}" class="menu-btn">Sit-in Records</a>
-            <a href="{{ url_for('reports') }}" class="menu-btn">Reports</a>
-            <a href="{{ url_for('feedback_reports') }}" class="menu-btn">View Feedback</a>
-            <a href="{{ url_for('logout') }}" class="menu-btn logout-btn">Logout</a>
+            <a href="{{ url_for('admin.admin_dashboard') }}" class="menu-btn active">Dashboard</a>
+            <a href="{{ url_for('admin.student_list') }}" class="menu-btn">Student List</a>
+            <a href="{{ url_for('admin.current_sit_in') }}" class="menu-btn">Current Sit-in</a>
+            <a href="{{ url_for('admin.sit_in_records') }}" class="menu-btn">Sit-in Records</a>
+            <a href="{{ url_for('admin.reports') }}" class="menu-btn">Reports</a>
+            <a href="{{ url_for('admin.feedback_reports') }}" class="menu-btn">View Feedback</a>
+            <a href="{{ url_for('admin.leaderboards') }}" class="menu-btn">Leaderboards</a>
+            <a href="{{ url_for('admin.logout') }}" class="menu-btn logout-btn">Logout</a>
         </div>
         <div class="content">
             <div class="container">
@@ -651,7 +652,8 @@
                                 </li>
                             {% endfor %}
                         </ul>
-                        <form action="{{ url_for('admin_dashboard') }}" method="post" class="add-announcement-form">
+                        <form action="{{ url_for('admin.admin_dashboard') }}" method="post" class="add-announcement-form">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="text" name="title" placeholder="Title" required>
                             <textarea name="content" placeholder="Content" required></textarea>
                             <button type="submit" class="add-btn">Add Announcement</button>
@@ -660,46 +662,90 @@
                 </div>
     <script>
         // Fetch data for the chart
-        fetch('/sit_in_purposes')
-            .then(response => response.json())
+        fetch('/admin/sit_in_purposes')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
             .then(data => {
+                console.log('Received data:', data); // Debug log
+                const chartContainer = document.getElementById('purposeChart').parentElement;
+                
+                if (!data.success) {
+                    throw new Error(data.message || 'Failed to load chart data');
+                }
+                
+                if (!data.labels || data.labels.length === 0) {
+                    chartContainer.innerHTML = '<p class="text-center mt-4">No sit-in data available</p>';
+                    return;
+                }
+                
                 const ctx = document.getElementById('purposeChart').getContext('2d');
+                const colors = Array(data.labels.length).fill('rgba(74, 53, 153, 0.6)');
+                
                 new Chart(ctx, {
-                    type: 'pie', // Change chart type to 'pie'
+                    type: 'bar',
                     data: {
                         labels: data.labels,
                         datasets: [{
-                            label: 'Number of Students',
+                            label: 'Number of Sit-ins',
                             data: data.counts,
-                            backgroundColor: [
-                                'rgba(75, 192, 192, 0.2)',
-                                'rgba(255, 99, 132, 0.2)',
-                                'rgba(255, 206, 86, 0.2)',
-                                'rgba(54, 162, 235, 0.2)',
-                                'rgba(153, 102, 255, 0.2)',
-                                'rgba(255, 159, 64, 0.2)'
-                            ],
-                            borderColor: [
-                                'rgba(75, 192, 192, 1)',
-                                'rgba(255, 99, 132, 1)',
-                                'rgba(255, 206, 86, 1)',
-                                'rgba(54, 162, 235, 1)',
-                                'rgba(153, 102, 255, 1)',
-                                'rgba(255, 159, 64, 1)'
-                            ],
-                            borderWidth: 1
+                            backgroundColor: colors,
+                            borderColor: 'rgb(74, 53, 153)',
+                            borderWidth: 1,
+                            borderRadius: 5,
+                            barThickness: 'flex',
+                            maxBarThickness: 35
                         }]
                     },
                     options: {
                         responsive: true,
+                        maintainAspectRatio: false,
                         plugins: {
                             legend: {
+                                display: true,
                                 position: 'top',
                             },
                             tooltip: {
+                                enabled: true,
+                                mode: 'index',
+                                intersect: false,
+                                padding: 12,
+                                backgroundColor: 'rgba(0, 0, 0, 0.8)',
                                 callbacks: {
-                                    label: function(tooltipItem) {
-                                        return tooltipItem.label + ': ' + tooltipItem.raw;
+                                    label: function(context) {
+                                        return `Count: ${context.raw}`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    precision: 0,
+                                    stepSize: 1
+                                },
+                                title: {
+                                    display: true,
+                                    text: 'Number of Students',
+                                    font: {
+                                        weight: 'bold'
+                                    }
+                                }
+                            },
+                            x: {
+                                ticks: {
+                                    maxRotation: 45,
+                                    minRotation: 45
+                                },
+                                title: {
+                                    display: true,
+                                    text: 'Purpose',
+                                    font: {
+                                        weight: 'bold'
                                     }
                                 }
                             }
@@ -707,42 +753,22 @@
                     }
                 });
             })
-            .catch(error => console.error('Error fetching chart data:', error));
-
-        function toggleEditForm(id) {
-            const item = document.getElementById(`edit-form-${id}`).closest('.announcement-item');
-            item.classList.toggle('editing');
-        }
-
-        function openEditModal(id, title, content) {
-            document.getElementById('editTitle').value = title;
-            document.getElementById('editContent').value = content;
-            document.getElementById('editAnnouncementForm').action = `/announcement/edit/${id}`;
-            document.getElementById('editModal').classList.add('show');
-        }
-
-        function closeEditModal() {
-            document.getElementById('editModal').classList.remove('show');
-        }
-
-        function openDeleteModal(id) {
-            document.getElementById('deleteAnnouncementForm').action = `/announcement/delete/${id}`;
-            document.getElementById('deleteModal').classList.add('show');
-        }
-
-        function closeDeleteModal() {
-            document.getElementById('deleteModal').classList.remove('show');
-        }
+            .catch(error => {
+                console.error('Chart error:', error);
+                const chartContainer = document.getElementById('purposeChart').parentElement;
+                chartContainer.innerHTML = `<p class="text-center mt-4 text-danger">Error loading chart data: ${error.message}</p>`;
+            });
     </script>
     <!-- Edit Announcement Modal -->
     <div class="modal" id="editModal">
-        <div class="modal-dialog">
+        <div class="modal-dialog"></div>
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Edit Announcement</h5>
                     
                 </div>
                 <form id="editAnnouncementForm" method="post">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="modal-body">
                         <input type="text" name="title" id="editTitle" class="form-control mb-3" required>
                         <textarea name="content" id="editContent" class="form-control mb-3" required></textarea>
@@ -764,6 +790,7 @@
                     <h5 class="modal-title">Delete Announcement</h5>
                 </div>
                 <form id="deleteAnnouncementForm" method="post">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="modal-body">
                         <p>Are you sure you want to delete this announcement?</p>
                     </div>

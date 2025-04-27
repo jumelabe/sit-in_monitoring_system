@@ -418,13 +418,14 @@
         <!-- Sidebar -->
         <div class="sidebar">
             <h1 class="dashboard-title">Student List</h1>
-            <a href="{{ url_for('admin_dashboard') }}" class="menu-btn">Dashboard</a>
-            <a href="{{ url_for('student_list') }}" class="menu-btn active">Student List</a>
-            <a href="{{ url_for('current_sit_in') }}" class="menu-btn">Current Sit-in</a>
-            <a href="{{ url_for('sit_in_records') }}" class="menu-btn">Sit-in Records</a>
-            <a href="{{ url_for('reports') }}" class="menu-btn">Reports</a>
-            <a href="{{ url_for('feedback_reports') }}" class="menu-btn">View Feedback</a>
-            <a href="{{ url_for('logout') }}" class="menu-btn logout-btn">Logout</a>
+            <a href="{{ url_for('admin.admin_dashboard') }}" class="menu-btn">Dashboard</a>
+            <a href="{{ url_for('admin.student_list') }}" class="menu-btn active">Student List</a>
+            <a href="{{ url_for('admin.current_sit_in') }}" class="menu-btn">Current Sit-in</a>
+            <a href="{{ url_for('admin.sit_in_records') }}" class="menu-btn">Sit-in Records</a>
+            <a href="{{ url_for('admin.reports') }}" class="menu-btn">Reports</a>
+            <a href="{{ url_for('admin.feedback_reports') }}" class="menu-btn">View Feedback</a>
+            <a href="{{ url_for('admin.leaderboards') }}" class="menu-btn">Leaderboards</a>
+            <a href="{{ url_for('admin.logout') }}" class="menu-btn logout-btn">Logout</a>
         </div>
 
         <!-- Main Content -->
@@ -536,6 +537,7 @@
                         Cancel
                     </button>
                     <form id="resetSessionForm" method="POST" style="display: inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-warning" style="width: 120px;">
                             Reset
                         </button>
@@ -560,7 +562,8 @@
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="width: 120px;">
                         Cancel
                     </button>
-                    <form action="{{ url_for('reset_all_sessions') }}" method="POST" style="display: inline;">
+                    <form action="{{ url_for('admin.reset_all_sessions') }}" method="POST" style="display: inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-warning" style="width: 120px;">
                             Reset All
                         </button>
@@ -578,7 +581,8 @@
                     <h5 class="modal-title" id="sitInModalLabel">Student Sit-In Form</h5>
                 </div>
                 <div class="modal-body">
-                    <form action="/sit_in" method="POST">
+                    <form id="sitInForm" action="{{ url_for('admin.sit_in') }}" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="mb-3">
                             <label for="idNumber" class="form-label">Student ID Number</label>
                             <input type="text" class="form-control" id="idNumber" name="id_number" readonly>
@@ -590,40 +594,43 @@
                         <div class="mb-3">
                             <label for="purpose" class="form-label">Purpose</label>
                             <select class="form-select" id="purpose" name="sit_purpose" required>
-                                <option value="" disabled selected>Choose a programming language...</option>
+                                <option value="" disabled selected>Select purpose...</option>
                                 <option value="C">C Programming</option>
                                 <option value="Java">Java Programming</option>
                                 <option value="Python">Python Programming</option>
                                 <option value="C#">C# Programming</option>
                                 <option value="Database">Database</option>
-                                <option value="Digital logic & Design">Digital logic & Design</option>
-                                <option value="Embedded Systems & IoT">Embedded Systems & IoT</option>
-                                <option value="System Integration & Architecture">System Integration & Architecture</option>
+                                <option value="Digital Logic">Digital Logic & Design</option>
+                                <option value="Embedded Systems">Embedded Systems & IoT</option>
+                                <option value="System Integration">System Integration & Architecture</option>
                                 <option value="Computer Application">Computer Application</option>
                                 <option value="Project Management">Project Management</option>
                                 <option value="IT Trends">IT Trends</option>
                                 <option value="Technopreneurship">Technopreneurship</option>
-                                <option value="Capstone">Capstone</option>
+                                <option value="Capstone">Capstone Project</option>
+                                <option value="Research">Research Work</option>
                             </select>
                         </div>
                         <div class="mb-3">
                             <label for="laboratory" class="form-label">Laboratory Room</label>
                             <select class="form-select" id="laboratory" name="laboratory" required>
                                 <option value="" disabled selected>Select laboratory room...</option>
-                                <option value="524">Room 524</option>
-                                <option value="526">Room 526</option>
-                                <option value="527">Room 528</option>
-                                <option value="530">Room 530</option>
-                                <option value="544">Room 542</option>
-                                <option value="544">Room 544</option>
-                                <option value="517">Room 517</option>
+                                <option value="524">Room 524 - Computer Laboratory</option>
+                                <option value="526">Room 526 - Computer Laboratory</option>
+                                <option value="527">Room 527 - Computer Laboratory</option>
+                                <option value="530">Room 530 - Computer Laboratory</option>
+                                <option value="542">Room 542 - Computer Laboratory</option>
+                                <option value="544">Room 544 - Computer Laboratory</option>
+                                <option value="517">Room 517 - Computer Laboratory</option>
                             </select>
                         </div>
                         <div class="mb-3">
-                            <label for="remainingSession" class="form-label">Remaining Session Hours</label>
-                            <input type="text" class="form-control" id="remainingSession" name="remaining_session" readonly>
+                            <label for="remainingSession" class="form-label">Remaining Session</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="remainingSession" name="remaining_session" readonly>
+                            </div>
                         </div>
-                        <div class="modal-footer">
+                        <div class="modal-footer px-0 pb-0">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                             <button type="submit" class="btn btn-primary">Start Session</button>
                         </div>
@@ -674,20 +681,69 @@
         }
 
         function fetchStudentData(studentId) {
-            fetch(`/get_student/${studentId}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        document.getElementById("idNumber").value = data.idno;
-                        document.getElementById("studentName").value = data.name;
-                        document.getElementById("remainingSession").value = data.session_count;
-                        new bootstrap.Modal(document.getElementById("sitInModal")).show();
-                    } else {
-                        alert("Student not found!");
-                    }
-                })
-                .catch(error => console.error("Error fetching student data:", error));
+            fetch(`/admin/get_student/${studentId}`, {
+                headers: {
+                    'Accept': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Received data:', data); // Add debugging log
+                if (data.success) {
+                    document.getElementById("idNumber").value = data.idno;
+                    document.getElementById("studentName").value = data.name;
+                    document.getElementById("remainingSession").value = data.session_count;
+                    
+                    // Show the modal using Bootstrap 5 syntax
+                    const modal = new bootstrap.Modal(document.getElementById("sitInModal"));
+                    modal.show();
+                } else {
+                    throw new Error(data.message || 'Student not found');
+                }
+            })
+            .catch(error => {
+                console.error("Error fetching student data:", error);
+                alert(error.message || "Error fetching student data. Please try again.");
+            });
         }
+
+        document.getElementById('sitInForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const data = {
+                id_number: formData.get('id_number'),
+                sit_purpose: formData.get('sit_purpose'),
+                laboratory: formData.get('laboratory')
+            };
+            
+            fetch(this.action, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': formData.get('csrf_token')
+                },
+                body: JSON.stringify(data),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Sit-in session started successfully!');
+                    window.location.reload();
+                } else {
+                    alert(data.message || 'Failed to start sit-in session');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while processing your request');
+            });
+        });
 
         function confirmDelete(studentId) {
             const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));

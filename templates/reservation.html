@@ -6,10 +6,10 @@
 <div class="dashboard-container">
     <div class="sidebar">
         <h1 class="dashboard-title">Reservation</h1>
-        <a href="{{ url_for('dashboard') }}" class="menu-btn">Dashboard</a>
-        <a href="{{ url_for('sit_in_history') }}" class="menu-btn">Sit-In History</a>
-        <a href="{{ url_for('reserve') }}" class="menu-btn active">Reservation</a>
-        <a href="{{ url_for('logout') }}" class="menu-btn logout-btn">Logout</a>
+        <a href="{{ url_for('student.dashboard') }}" class="menu-btn">Dashboard</a>
+        <a href="{{ url_for('student.sit_in_history') }}" class="menu-btn">Sit-In History</a>
+        <a href="{{ url_for('student.reserve') }}" class="menu-btn active">Reservation</a>
+        <a href="{{ url_for('auth.logout') }}" class="menu-btn logout-btn">Logout</a>
     </div>
 
     <div class="content-container">
@@ -18,7 +18,7 @@
             {% if success_message %}
             <div class="success-message">{{ success_message }}</div>
             {% endif %}
-            <form action="/reserve" method="POST" class="reservation-form">
+            <form action="{{ url_for('student.reserve') }}" method="POST" class="reservation-form">
                 <label for="id_number">ID Number:</label>
                 <input type="text" id="id_number" name="id_number" value="{{ id_number }}" readonly>
 

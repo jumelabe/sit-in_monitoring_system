@@ -1,14 +1,27 @@
 {% extends "base.html" %}
 
-{% block title %}{% endblock %}
+{% block title %}Login - CCS Sit-In Monitoring System{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+{% endblock %}
 
 {% block content %}
 <div class="login-container">
   <div class="login-form">
     <h2>Sign In</h2>
-    <form method="POST" action="{{ url_for('login') }}">
-      <input type="text" name="user_id" class="form-control" placeholder="User ID" required>
-      <input type="password" name="password" class="form-control" placeholder="Password" required>
+    <form method="POST" action="{{ url_for('auth.login') }}" novalidate>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group">
+        <label for="user_id">User ID</label>
+        <input type="text" id="user_id" name="user_id" class="form-control" required 
+               minlength="3" maxlength="50" placeholder="Enter your user ID">
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" class="form-control" required
+               minlength="6" placeholder="Enter your password">
+      </div>
       <div class="form-check remember-me">
         <input class="form-check-input" type="checkbox" id="remember" name="remember">
         <label class="form-check-label" for="remember">Remember Me</label>
@@ -24,7 +37,7 @@
       <img src="{{ url_for('static', filename='images/css.png') }}" alt="Logo" class="login-logo">
       <h3>CCS Sit-In Monitoring System</h3>&nbsp;&nbsp;
       <p>Don't have an account?</p>
-      <a href="{{ url_for('register') }}" class="btn btn-outline">Register</a>
+      <a href="{{ url_for('auth.register') }}" class="btn btn-outline">Register</a>
     </div>
   </div>
 </div>
