@@ -104,3 +104,4 @@ def student_required(f):
 
 if __name__ == '__main__':
     app.run(debug=True)
+    # app.run(debug=True, host='192.168.254.199', port=5000)
