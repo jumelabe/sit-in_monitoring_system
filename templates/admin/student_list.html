@@ -13,6 +13,232 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> <!-- Add Chart.js -->
     <!-- Add Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <h1 class="dashboard-title">Student List</h1>
+            <a href="{{ url_for('admin.admin_dashboard') }}" class="menu-btn">Dashboard</a>
+            <a href="{{ url_for('admin.student_list') }}" class="menu-btn active">Student List</a>
+            <a href="{{ url_for('admin.current_sit_in') }}" class="menu-btn">Current Sit-in</a>
+            <a href="{{ url_for('admin.sit_in_records') }}" class="menu-btn">Sit-in Records</a>
+            <a href="{{ url_for('admin.reports') }}" class="menu-btn">Reports</a>
+            <a href="{{ url_for('admin.feedback_reports') }}" class="menu-btn">View Feedback</a>
+            <a href="{{ url_for('admin.leaderboards') }}" class="menu-btn">Leaderboards</a>
+            <a href="{{ url_for('admin.logout') }}" class="menu-btn logout-btn">Logout</a>
+        </div>
+
+        <!-- Main Content -->
+        <div class="content">
+            <div class="container">
+                <!-- Student List Section -->
+                <div class="student-list">
+                    <div class="header-container">
+                        <h2>List of Students</h2>
+                        <div class="search-container" style="display: flex; align-items: center; gap: 10px;">
+                            <input type="text" id="searchInput" placeholder="Enter Student ID..." onkeydown="handleSearch(event)">
+                            <button class="btn btn-primary" type="button" onclick="searchStudents()" style="background-color: #4A3599; border: none;">Search</button>
+                            <button class="btn btn-primary" onclick="confirmResetAllSessions()" style="background-color: #4A3599; border: none;">Reset All Sessions</button>
+                        </div>
+                    </div>
+                    <div class="table-container" style="max-height: 500px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px;">
+                        <table class="table table-bordered table-hover mt-4" id="studentTable">
+                            <thead class="thead-dark">
+                                <tr>
+                                    <th>ID Number</th>
+                                    <th>First Name</th>
+                                    <th>Middle Name</th>
+                                    <th>Last Name</th>
+                                    <th>Course</th>
+                                    <th>Year Level</th>
+                                    <th>Email Address</th>
+                                    <th>Profile Picture</th>
+                                    <th>Session Count</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for student in students %}
+                                <tr>
+                                    <td>{{ student.idno }}</td>
+                                    <td>{{ student.firstname }}</td>
+                                    <td>{{ student.midname }}</td>
+                                    <td>{{ student.lastname }}</td>
+                                    <td>{{ student.course }}</td>
+                                    <td>{{ student.year_level }}</td>
+                                    <td>{{ student.email_address }}</td>
+                                    <td>
+                                        {% if student.profile_picture %}
+                                        <img src="{{ url_for('static', filename=student.profile_picture) }}" alt="Profile Picture" class="profile-pic">
+                                        {% else %}
+                                        N/A
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ student.session_count }}</td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="action-btn btn-remove" onclick="confirmDelete('{{ student.idno }}')" title="Remove Student">
+                                                <i class="fas fa-trash-alt"></i>
+                                            </button>
+                                            <button class="action-btn btn-reset" onclick="confirmResetSession('{{ student.idno }}')" title="Reset Session Count">
+                                                <i class="fas fa-redo-alt"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <!-- Delete Confirmation Modal -->
+    <div class="modal fade" id="deleteModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteModalLabel">Confirm Deletion</h5>
+                </div>
+                <div class="modal-body text-center">
+                    <i class="fas fa-exclamation-triangle text-warning mb-3" style="font-size: 3rem;"></i>
+                    <p class="mb-0">Are you sure you want to remove this student from the system?</p>
+                    <p class="text-muted small">This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="width: 120px;">
+                        Cancel
+                    </button>
+                    <form id="deleteForm" method="POST" style="display: inline;">
+                        <button type="submit" class="btn btn-danger" style="width: 120px;">
+                            Delete
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reset Session Confirmation Modal -->
+    <div class="modal fade" id="resetSessionModal" tabindex="-1" role="dialog" aria-labelledby="resetSessionModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="resetSessionModalLabel">Confirm Reset</h5>
+                </div>
+                <div class="modal-body text-center">
+                    <p class="mb-0">Are you sure you want to reset this student's session count?</p>
+                </div>
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="width: 120px;">
+                        Cancel
+                    </button>
+                    <form id="resetSessionForm" method="POST" style="display: inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-warning" style="width: 120px;">
+                            Reset
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reset All Sessions Confirmation Modal -->
+    <div class="modal fade" id="resetAllSessionsModal" tabindex="-1" role="dialog" aria-labelledby="resetAllSessionsModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="resetAllSessionsModalLabel">Confirm Reset All</h5>
+                </div>
+                <div class="modal-body text-center">
+                    <p class="mb-0">Are you sure you want to reset ALL students session counts?</p>
+                    <p class="text-danger">This action cannot be undone!</p>
+                </div>
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="width: 120px;">
+                        Cancel
+                    </button>
+                    <form action="{{ url_for('admin.reset_all_sessions') }}" method="POST" style="display: inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-warning" style="width: 120px;">
+                            Reset All
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sit-in Modal -->
+    <div class="modal fade" id="sitInModal" tabindex="-1" role="dialog" aria-labelledby="sitInModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="sitInModalLabel">Student Sit-In Form</h5>
+                </div>
+                <div class="modal-body">
+                    <form id="sitInForm" action="{{ url_for('admin.sit_in') }}" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="mb-3">
+                            <label for="idNumber" class="form-label">Student ID Number</label>
+                            <input type="text" class="form-control" id="idNumber" name="id_number" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label for="studentName" class="form-label">Student Name</label>
+                            <input type="text" class="form-control" id="studentName" name="name" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label for="purpose" class="form-label">Purpose</label>
+                            <select class="form-select" id="purpose" name="sit_purpose" required>
+                                <option value="" disabled selected>Select purpose...</option>
+                                <option value="C">C Programming</option>
+                                <option value="Java">Java Programming</option>
+                                <option value="Python">Python Programming</option>
+                                <option value="C#">C# Programming</option>
+                                <option value="Database">Database</option>
+                                <option value="Digital Logic">Digital Logic & Design</option>
+                                <option value="Embedded Systems">Embedded Systems & IoT</option>
+                                <option value="System Integration">System Integration & Architecture</option>
+                                <option value="Computer Application">Computer Application</option>
+                                <option value="Project Management">Project Management</option>
+                                <option value="IT Trends">IT Trends</option>
+                                <option value="Technopreneurship">Technopreneurship</option>
+                                <option value="Capstone">Capstone</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="laboratory" class="form-label">Laboratory Room</label>
+                            <select class="form-select" id="laboratory" name="laboratory" required>
+                                <option value="" disabled selected>Select laboratory room...</option>
+                                <option value="524">Room 524 - Computer Laboratory</option>
+                                <option value="526">Room 526 - Computer Laboratory</option>
+                                <option value="527">Room 527 - Computer Laboratory</option>
+                                <option value="530">Room 530 - Computer Laboratory</option>
+                                <option value="542">Room 542 - Computer Laboratory</option>
+                                <option value="544">Room 544 - Computer Laboratory</option>
+                                <option value="517">Room 517 - Computer Laboratory</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="remainingSession" class="form-label">Remaining Session</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="remainingSession" name="remaining_session" readonly>
+                            </div>
+                        </div>
+                        <div class="modal-footer px-0 pb-0">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Start Session</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <style>
         .container {
@@ -411,233 +637,6 @@
             background-color: #c4b9f9;
         }
     </style>
-</head>
-<body>
-    <div class="dashboard-container">
-        <!-- Sidebar -->
-        <div class="sidebar">
-            <h1 class="dashboard-title">Student List</h1>
-            <a href="{{ url_for('admin.admin_dashboard') }}" class="menu-btn">Dashboard</a>
-            <a href="{{ url_for('admin.student_list') }}" class="menu-btn active">Student List</a>
-            <a href="{{ url_for('admin.current_sit_in') }}" class="menu-btn">Current Sit-in</a>
-            <a href="{{ url_for('admin.sit_in_records') }}" class="menu-btn">Sit-in Records</a>
-            <a href="{{ url_for('admin.reports') }}" class="menu-btn">Reports</a>
-            <a href="{{ url_for('admin.feedback_reports') }}" class="menu-btn">View Feedback</a>
-            <a href="{{ url_for('admin.leaderboards') }}" class="menu-btn">Leaderboards</a>
-            <a href="{{ url_for('admin.logout') }}" class="menu-btn logout-btn">Logout</a>
-        </div>
-
-        <!-- Main Content -->
-        <div class="content">
-            <div class="container">
-                <!-- Student List Section -->
-                <div class="student-list">
-                    <div class="header-container">
-                        <h2>List of Students</h2>
-                        <div class="search-container" style="display: flex; align-items: center; gap: 10px;">
-                            <input type="text" id="searchInput" placeholder="Enter Student ID..." onkeydown="handleSearch(event)">
-                            <button class="btn btn-primary" type="button" onclick="searchStudents()" style="background-color: #4A3599; border: none;">Search</button>
-                            <button class="btn btn-primary" onclick="confirmResetAllSessions()" style="background-color: #4A3599; border: none;">Reset All Sessions</button>
-                        </div>
-                    </div>
-                    <div class="table-container" style="max-height: 500px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px;">
-                        <table class="table table-bordered table-hover mt-4" id="studentTable">
-                            <thead class="thead-dark">
-                                <tr>
-                                    <th>ID Number</th>
-                                    <th>First Name</th>
-                                    <th>Middle Name</th>
-                                    <th>Last Name</th>
-                                    <th>Course</th>
-                                    <th>Year Level</th>
-                                    <th>Email Address</th>
-                                    <th>Profile Picture</th>
-                                    <th>Session Count</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for student in students %}
-                                <tr>
-                                    <td>{{ student.idno }}</td>
-                                    <td>{{ student.firstname }}</td>
-                                    <td>{{ student.midname }}</td>
-                                    <td>{{ student.lastname }}</td>
-                                    <td>{{ student.course }}</td>
-                                    <td>{{ student.year_level }}</td>
-                                    <td>{{ student.email_address }}</td>
-                                    <td>
-                                        {% if student.profile_picture %}
-                                        <img src="{{ url_for('static', filename=student.profile_picture) }}" alt="Profile Picture" class="profile-pic">
-                                        {% else %}
-                                        N/A
-                                        {% endif %}
-                                    </td>
-                                    <td>{{ student.session_count }}</td>
-                                    <td>
-                                        <div class="action-buttons">
-                                            <button class="action-btn btn-remove" onclick="confirmDelete('{{ student.idno }}')" title="Remove Student">
-                                                <i class="fas fa-trash-alt"></i>
-                                            </button>
-                                            <button class="action-btn btn-reset" onclick="confirmResetSession('{{ student.idno }}')" title="Reset Session Count">
-                                                <i class="fas fa-redo-alt"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modals -->
-    <!-- Delete Confirmation Modal -->
-    <div class="modal fade" id="deleteModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="deleteModalLabel">Confirm Deletion</h5>
-                </div>
-                <div class="modal-body text-center">
-                    <i class="fas fa-exclamation-triangle text-warning mb-3" style="font-size: 3rem;"></i>
-                    <p class="mb-0">Are you sure you want to remove this student from the system?</p>
-                    <p class="text-muted small">This action cannot be undone.</p>
-                </div>
-                <div class="modal-footer justify-content-center">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="width: 120px;">
-                        Cancel
-                    </button>
-                    <form id="deleteForm" method="POST" style="display: inline;">
-                        <button type="submit" class="btn btn-danger" style="width: 120px;">
-                            Delete
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Reset Session Confirmation Modal -->
-    <div class="modal fade" id="resetSessionModal" tabindex="-1" role="dialog" aria-labelledby="resetSessionModalLabel" aria-hidden="true">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="resetSessionModalLabel">Confirm Reset</h5>
-                </div>
-                <div class="modal-body text-center">
-                    <p class="mb-0">Are you sure you want to reset this student's session count?</p>
-                </div>
-                <div class="modal-footer justify-content-center">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="width: 120px;">
-                        Cancel
-                    </button>
-                    <form id="resetSessionForm" method="POST" style="display: inline;">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button type="submit" class="btn btn-warning" style="width: 120px;">
-                            Reset
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Reset All Sessions Confirmation Modal -->
-    <div class="modal fade" id="resetAllSessionsModal" tabindex="-1" role="dialog" aria-labelledby="resetAllSessionsModalLabel" aria-hidden="true">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="resetAllSessionsModalLabel">Confirm Reset All</h5>
-                </div>
-                <div class="modal-body text-center">
-                    <p class="mb-0">Are you sure you want to reset ALL students session counts?</p>
-                    <p class="text-danger">This action cannot be undone!</p>
-                </div>
-                <div class="modal-footer justify-content-center">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="width: 120px;">
-                        Cancel
-                    </button>
-                    <form action="{{ url_for('admin.reset_all_sessions') }}" method="POST" style="display: inline;">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button type="submit" class="btn btn-warning" style="width: 120px;">
-                            Reset All
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Sit-in Modal -->
-    <div class="modal fade" id="sitInModal" tabindex="-1" role="dialog" aria-labelledby="sitInModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="sitInModalLabel">Student Sit-In Form</h5>
-                </div>
-                <div class="modal-body">
-                    <form id="sitInForm" action="{{ url_for('admin.sit_in') }}" method="POST">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <div class="mb-3">
-                            <label for="idNumber" class="form-label">Student ID Number</label>
-                            <input type="text" class="form-control" id="idNumber" name="id_number" readonly>
-                        </div>
-                        <div class="mb-3">
-                            <label for="studentName" class="form-label">Student Name</label>
-                            <input type="text" class="form-control" id="studentName" name="name" readonly>
-                        </div>
-                        <div class="mb-3">
-                            <label for="purpose" class="form-label">Purpose</label>
-                            <select class="form-select" id="purpose" name="sit_purpose" required>
-                                <option value="" disabled selected>Select purpose...</option>
-                                <option value="C">C Programming</option>
-                                <option value="Java">Java Programming</option>
-                                <option value="Python">Python Programming</option>
-                                <option value="C#">C# Programming</option>
-                                <option value="Database">Database</option>
-                                <option value="Digital Logic">Digital Logic & Design</option>
-                                <option value="Embedded Systems">Embedded Systems & IoT</option>
-                                <option value="System Integration">System Integration & Architecture</option>
-                                <option value="Computer Application">Computer Application</option>
-                                <option value="Project Management">Project Management</option>
-                                <option value="IT Trends">IT Trends</option>
-                                <option value="Technopreneurship">Technopreneurship</option>
-                                <option value="Capstone">Capstone Project</option>
-                                <option value="Research">Research Work</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label for="laboratory" class="form-label">Laboratory Room</label>
-                            <select class="form-select" id="laboratory" name="laboratory" required>
-                                <option value="" disabled selected>Select laboratory room...</option>
-                                <option value="524">Room 524 - Computer Laboratory</option>
-                                <option value="526">Room 526 - Computer Laboratory</option>
-                                <option value="527">Room 527 - Computer Laboratory</option>
-                                <option value="530">Room 530 - Computer Laboratory</option>
-                                <option value="542">Room 542 - Computer Laboratory</option>
-                                <option value="544">Room 544 - Computer Laboratory</option>
-                                <option value="517">Room 517 - Computer Laboratory</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label for="remainingSession" class="form-label">Remaining Session</label>
-                            <div class="input-group">
-                                <input type="text" class="form-control" id="remainingSession" name="remaining_session" readonly>
-                            </div>
-                        </div>
-                        <div class="modal-footer px-0 pb-0">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-primary">Start Session</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <script>
         function searchStudents() {

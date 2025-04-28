@@ -86,6 +86,19 @@
             margin-bottom: 15px;
             color: #34495e;
         }
+
+        .rank-1, .rank-2, .rank-3 {
+            font-weight: bold;
+        }
+        .rank-1 {
+            color: #FFD700; /* Gold */
+        }
+        .rank-2 {
+            color: #C0C0C0; /* Silver */
+        }
+        .rank-3 {
+            color: #CD7F32; /* Bronze */
+        }
     </style>
 </head>
 <body>
@@ -128,7 +141,17 @@
                         <tbody id="leaderboardTableBody">
                             {% for student in leaderboard_data %}
                             <tr>
-                                <td>{{ loop.index }}</td>
+                                <td>
+                                    {% if loop.index == 1 %}
+                                        <span class="rank-1">🥇 1</span>
+                                    {% elif loop.index == 2 %}
+                                        <span class="rank-2">🥈 2</span>
+                                    {% elif loop.index == 3 %}
+                                        <span class="rank-3">🥉 3</span>
+                                    {% else %}
+                                        {{ loop.index }}
+                                    {% endif %}
+                                </td>
                                 <td>{{ student.idno }}</td>
                                 <td>{{ student.firstname }} {{ student.lastname }}</td>
                                 <td>{{ student.course }}</td>

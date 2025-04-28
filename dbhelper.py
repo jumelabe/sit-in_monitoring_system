@@ -220,17 +220,49 @@ def get_sit_in_purposes_stats():
             conn.close()
 
 def get_sit_in_history_by_student(idno):
+    """Get sit-in history for a specific student."""
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT id, id_number, name, sit_purpose, laboratory, login_time, logout_time, date, feedback, feedback_date
-        FROM sit_in_history
-        WHERE id_number = ?
-        ORDER BY date DESC, login_time DESC
-    """, (idno,))
-    history = cursor.fetchall()
-    conn.close()
-    return history
+    try:
+        cursor.execute("""
+            SELECT 
+                h.id,
+                h.id_number,
+                h.name,
+                h.sit_purpose,
+                h.laboratory,
+                datetime(h.login_time, 'localtime') as login_time,
+                datetime(h.logout_time, 'localtime') as logout_time,
+                h.date,
+                h.action,
+                h.feedback,
+                datetime(h.feedback_date, 'localtime') as feedback_date
+            FROM sit_in_history h
+            WHERE h.id_number = ?
+            ORDER BY h.date DESC, h.login_time DESC
+        """, (idno,))
+        
+        history = cursor.fetchall()
+        print(f"Found {len(history)} history records for student {idno}")  # Debug print
+        
+        return [{
+            'id': row['id'],
+            'id_number': row['id_number'],
+            'name': row['name'],
+            'sit_purpose': row['sit_purpose'],
+            'laboratory': row['laboratory'],
+            'login_time': row['login_time'],
+            'logout_time': row['logout_time'],
+            'date': row['date'],
+            'action': row['action'],
+            'feedback': row['feedback'],
+            'feedback_date': row['feedback_date']
+        } for row in history]
+    except Exception as e:
+        print(f"Error getting sit-in history: {e}")
+        return []
+    finally:
+        conn.close()
 
 def insert_feedback(history_id, feedback, user_id):
     conn = get_connection()
@@ -553,33 +585,30 @@ def get_feedbacks(selected_lab=None):
     } for f in feedbacks]
 
 def reset_all_active_sessions():
-    """Reset all active sit-in sessions, session counts, and sit-in histories for all students."""
+    """Reset all students' session counts to 30, reset reward points, redeemable points, and sit-in counts (leaderboards)."""
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        
-        # Begin transaction
-        conn.execute("BEGIN TRANSACTION")
-        
-        # Update all active sit-in records with current timestamp
-        cursor.execute("""
-            UPDATE sit_in_records 
-            SET logout_time = datetime('now', 'localtime')
-            WHERE logout_time IS NULL
-        """)
-        
-        # Reset session count to 30 for all students
+        # Ensure reward_points and reward_redeemable columns exist
+        try:
+            cursor.execute("ALTER TABLE students ADD COLUMN reward_points INTEGER DEFAULT 0")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
+        try:
+            cursor.execute("ALTER TABLE students ADD COLUMN reward_redeemable INTEGER DEFAULT 0")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
+        # Reset session count, reward_points, and reward_redeemable for all students
         cursor.execute("""
             UPDATE students 
-            SET session_count = 30
+            SET session_count = 30,
+                reward_points = 0,
+                reward_redeemable = 0
         """)
-        
-        # Delete all sit-in records
+        # Delete all sit-in records (reset sit-in count for all students)
         cursor.execute("DELETE FROM sit_in_records")
-        
-        # Delete all sit-in history records
-        cursor.execute("DELETE FROM sit_in_history")
-
         conn.commit()
         return True
     except Exception as e:
@@ -590,28 +619,82 @@ def reset_all_active_sessions():
         conn.close()
 
 def reset_student_session(idno):
-    """Reset session count and sit-in history for a specific student."""
+    """Reset session count, reward points, redeemable points, and sit-in count for a specific student."""
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        
-        # Reset session count to 30 for the student
+        # Ensure reward_points and reward_redeemable columns exist
+        try:
+            cursor.execute("ALTER TABLE students ADD COLUMN reward_points INTEGER DEFAULT 0")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
+        try:
+            cursor.execute("ALTER TABLE students ADD COLUMN reward_redeemable INTEGER DEFAULT 0")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
+        # Reset session count, reward_points, and reward_redeemable for the student
         cursor.execute("""
             UPDATE students 
-            SET session_count = 30
+            SET session_count = 30,
+                reward_points = 0,
+                reward_redeemable = 0
             WHERE idno = ?
         """, (idno,))
-        
-        # Delete all sit-in records for this student
+        # Delete sit-in records for this student (reset sit-in count for this student)
         cursor.execute("DELETE FROM sit_in_records WHERE id_number = ?", (idno,))
-
-        # Delete sit-in history for this student
-        cursor.execute("DELETE FROM sit_in_history WHERE id_number = ?", (idno,))
-
         conn.commit()
         return True
     except Exception as e:
         print(f"Error in reset_student_session: {e}")
+        return False
+    finally:
+        conn.close()
+
+def insert_sit_in_history_from_record(student_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT 
+                sir.id_number,
+                sir.name,
+                sir.purpose as sit_purpose,
+                sir.lab as laboratory,
+                datetime(sir.login_time, 'localtime') as login_time,
+                datetime(sir.logout_time, 'localtime') as logout_time,
+                date(sir.login_time, 'localtime') as date
+            FROM sit_in_records sir
+            WHERE sir.id_number = ? AND sir.logout_time IS NOT NULL
+            ORDER BY sir.logout_time DESC LIMIT 1
+        """, (student_id,))
+        record = cursor.fetchone()
+
+        if record:
+            # Insert into sit_in_history with proper field mapping and default action
+            cursor.execute("""
+                INSERT INTO sit_in_history (
+                    id_number, name, sit_purpose, laboratory,
+                    login_time, logout_time, date, action
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                record['id_number'],
+                record['name'],
+                record['sit_purpose'],
+                record['laboratory'],
+                record['login_time'],
+                record['logout_time'],
+                record['date'],
+                'Completed'  # Default action value
+            ))
+            conn.commit()
+            print(f"Successfully inserted history record for student {student_id}")  # Debug print
+            return True
+        return False
+    except Exception as e:
+        print(f"Error inserting sit-in history: {e}")
+        conn.rollback()
         return False
     finally:
         conn.close()
@@ -643,6 +726,11 @@ def add_reward_point(student_id):
             SET logout_time = datetime('now', 'localtime')
             WHERE id_number = ? AND logout_time IS NULL
         """, (student_id,))
+
+        # Insert into sit_in_history after session ends
+        conn.commit()  # Commit the logout_time update before copying to history
+        insert_sit_in_history_from_record(student_id)
+        cursor = conn.cursor()  # Re-acquire cursor after commit
 
         # Add 1 to both reward_points (total) and reward_redeemable (for redemption logic)
         cursor.execute("""

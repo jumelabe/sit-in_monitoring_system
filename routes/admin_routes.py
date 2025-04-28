@@ -44,15 +44,35 @@ def admin_dashboard():
 @admin_bp.route('/announcement/edit/<int:id>', methods=['POST'])
 def edit_announcement(id):
     if session.get('user_type') != 'admin':
-        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+        flash("Admin access required.", "danger")
+        return redirect(url_for('auth.login'))
 
     title = request.form.get('title')
     content = request.form.get('content')
     
-    if update_announcement(id, title, content):
+    if not title or not content:
+        flash('Title and content are required.', 'danger')
+        return redirect(url_for('admin.admin_dashboard'))
+    
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            UPDATE announcements 
+            SET title = ?, content = ?
+            WHERE id = ?
+        """, (title, content, id))
+        
+        conn.commit()
         flash('Announcement updated successfully!', 'success')
-    else:
-        flash('Failed to update announcement.', 'danger')
+        
+    except Exception as e:
+        conn.rollback()
+        flash(f'Error updating announcement: {str(e)}', 'danger')
+        
+    finally:
+        conn.close()
     
     return redirect(url_for('admin.admin_dashboard'))
 
@@ -61,10 +81,13 @@ def delete_announcement_route(id):
     if session.get('user_type') != 'admin':
         return jsonify({'success': False, 'message': 'Unauthorized'}), 401
 
-    if delete_announcement(id):
-        flash('Announcement deleted successfully!', 'success')
-    else:
-        flash('Failed to delete announcement.', 'danger')
+    try:
+        if delete_announcement(id):
+            flash('Announcement deleted successfully!', 'success')
+        else:
+            flash('Failed to delete announcement.', 'danger')
+    except Exception as e:
+        flash(f'Error deleting announcement: {str(e)}', 'danger')
     
     return redirect(url_for('admin.admin_dashboard'))
 
@@ -252,22 +275,15 @@ def reset_all_sessions():
         return redirect(url_for('auth.login'))
     
     try:
-        # Now resets both session counts, leaderboard points, and sit-in history
+        # Only reset session counts for all students
         success = reset_all_active_sessions()
-        # --- Remove all sit-in history records for all students ---
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM sit_in_records")
-        conn.commit()
-        conn.close()
-        # ----------------------------------------------------------
         if success:
-            flash('All sessions, leaderboards, and sit-in histories have been reset successfully!', 'success')
+            flash('All students\' session counts have been reset successfully!', 'success')
         else:
-            flash('Failed to reset sessions, leaderboards, or sit-in histories.', 'danger')
+            flash('Failed to reset session counts.', 'danger')
         return redirect(url_for('admin.student_list'))
     except Exception as e:
-        flash(f'Error resetting sessions: {str(e)}', 'danger')
+        flash(f'Error resetting session counts: {str(e)}', 'danger')
         return redirect(url_for('admin.student_list'))
 
 @admin_bp.route('/end_session', methods=['POST'])
@@ -285,7 +301,6 @@ def end_session():
     cursor = conn.cursor()
     
     try:
-        # Begin transaction
         conn.execute("BEGIN TRANSACTION")
         
         # First check if there's an active session
@@ -298,31 +313,28 @@ def end_session():
         if cursor.fetchone()[0] == 0:
             return jsonify({'success': False, 'message': 'No active session found'}), 400
 
-        # End the session by updating logout time
+        # End the session
         cursor.execute("""
             UPDATE sit_in_records 
             SET logout_time = datetime('now', 'localtime')
             WHERE id_number = ? AND logout_time IS NULL
         """, (id_number,))
         
-        # Update session count by deducting 1
-        cursor.execute("""
-            UPDATE students 
-            SET session_count = CASE
-                WHEN session_count > 0 THEN session_count - 1
-                ELSE 0
-            END
-            WHERE idno = ?
-        """, (id_number,))
-        
         conn.commit()
+
+        # Insert into history
+        success = insert_sit_in_history_from_record(id_number)
+        if not success:
+            return jsonify({'success': False, 'message': 'Failed to create history record'}), 500
+
         return jsonify({
             'success': True,
-            'message': 'Session ended successfully'
+            'message': 'Session ended and history updated successfully'
         })
         
     except Exception as e:
         conn.rollback()
+        print(f"Error in end_session: {e}")  # Debug print
         return jsonify({
             'success': False,
             'message': f'Error ending session: {str(e)}'
@@ -331,7 +343,6 @@ def end_session():
     finally:
         conn.close()
 
-# Update the route to remove redundant /admin prefix
 @admin_bp.route('/get_student/<idno>')  # Changed from /admin/get_student/<idno>
 def get_student(idno):
     if session.get('user_type') != 'admin':
@@ -419,19 +430,12 @@ def reset_session(idno):
         return redirect(url_for('auth.login'))
     
     try:
-        # Now resets both session count, leaderboard points, and sit-in history for the student
+        # Only reset session count for the student
         success = reset_student_session(idno)
-        # --- Remove sit-in history records for this student ---
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM sit_in_records WHERE id_number = ?", (idno,))
-        conn.commit()
-        conn.close()
-        # ------------------------------------------------------
         if success:
-            flash('Session count, leaderboard points, and sit-in history reset successfully!', 'success')
+            flash('Session count reset successfully!', 'success')
         else:
-            flash('Failed to reset session count, leaderboard points, or sit-in history.', 'danger')
+            flash('Failed to reset session count.', 'danger')
         return redirect(url_for('admin.student_list'))
     except Exception as e:
         flash(f'Error resetting session count: {str(e)}', 'danger')

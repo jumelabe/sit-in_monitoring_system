@@ -759,23 +759,85 @@
                 chartContainer.innerHTML = `<p class="text-center mt-4 text-danger">Error loading chart data: ${error.message}</p>`;
             });
     </script>
+    <script>
+        function openEditModal(id, title, content) {
+            const modal = document.getElementById('editModal');
+            const form = document.getElementById('editAnnouncementForm');
+            const titleInput = document.getElementById('editTitle');
+            const contentInput = document.getElementById('editContent');
+            
+            // Decode HTML entities and set form values
+            titleInput.value = decodeHtmlEntities(title);
+            contentInput.value = decodeHtmlEntities(content);
+            form.action = `/admin/announcement/edit/${id}`;
+            
+            modal.classList.add('show');
+            modal.style.display = 'flex';
+        }
+
+        function decodeHtmlEntities(text) {
+            const textarea = document.createElement('textarea');
+            textarea.innerHTML = text;
+            return textarea.value;
+        }
+
+        function closeEditModal() {
+            const modal = document.getElementById('editModal');
+            modal.classList.remove('show');
+            modal.style.display = 'none';
+        }
+
+        function openDeleteModal(id) {
+            const modal = document.getElementById('deleteModal');
+            const form = document.getElementById('deleteAnnouncementForm');
+            
+            form.action = `/admin/announcement/delete/${id}`;
+            
+            modal.classList.add('show');
+            modal.style.display = 'flex';
+        }
+
+        function closeDeleteModal() {
+            const modal = document.getElementById('deleteModal');
+            modal.classList.remove('show');
+            modal.style.display = 'none';
+        }
+
+        // Close modals when clicking outside
+        window.onclick = function(event) {
+            const editModal = document.getElementById('editModal');
+            const deleteModal = document.getElementById('deleteModal');
+            
+            if (event.target === editModal) {
+                closeEditModal();
+            }
+            if (event.target === deleteModal) {
+                closeDeleteModal();
+            }
+        }
+    </script>
     <!-- Edit Announcement Modal -->
     <div class="modal" id="editModal">
-        <div class="modal-dialog"></div>
+        <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Edit Announcement</h5>
-                    
                 </div>
                 <form id="editAnnouncementForm" method="post">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="modal-body">
-                        <input type="text" name="title" id="editTitle" class="form-control mb-3" required>
-                        <textarea name="content" id="editContent" class="form-control mb-3" required></textarea>
+                        <div class="mb-3">
+                            <label for="editTitle" class="form-label">Title</label>
+                            <input type="text" name="title" id="editTitle" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editContent" class="form-label">Content</label>
+                            <textarea name="content" id="editContent" class="form-control" rows="4" required></textarea>
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Save</button>
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
                     </div>
                 </form>
             </div>

@@ -4,6 +4,7 @@ from werkzeug.utils import secure_filename
 from datetime import datetime
 import os
 from dbhelper import *
+from dbhelper import insert_sit_in_history_from_record
 
 student_bp = Blueprint('student', __name__, url_prefix='/student')
 csrf = CSRFProtect()
@@ -37,6 +38,15 @@ def dashboard():
 
     announcements = get_announcements()
     return render_template('dashboard.html', user=user_data, announcements=announcements)
+
+@student_bp.route('/announcements')
+def announcements():
+    if session.get('user_type') != 'student':
+        session.clear()
+        return redirect(url_for('auth.login'))
+    
+    announcements = get_announcements()
+    return render_template('announcement.html', announcements=announcements)
 
 @student_bp.route('/edit_profile', methods=['POST'])
 def edit_profile():
@@ -84,9 +94,11 @@ def sit_in_history():
     
     student_id = session.get('user_id')
     history = get_sit_in_history_by_student(student_id)
-    history = [dict(row) for row in history]
-    # Pass CSRF token to template for feedback form
     csrf_token = generate_csrf()
+    
+    # Add debug print to verify data
+    print(f"Retrieved {len(history)} history records for student {student_id}")
+    
     return render_template('sit_in_history.html', history=history, csrf_token=csrf_token)
 
 @student_bp.route('/reserve', methods=['GET', 'POST'])
@@ -144,15 +156,15 @@ def reset_all_sessions():
         return redirect(url_for('auth.login'))
     
     try:
-        # Reset all active sessions and sit-in history
+        # Only reset session counts for all students
         success = reset_all_active_sessions()
         if success:
-            flash('All sessions and sit-in histories have been reset successfully!', 'success')
+            flash('All students\' session counts have been reset successfully!', 'success')
         else:
-            flash('Failed to reset sessions or sit-in histories.', 'danger')
+            flash('Failed to reset session counts.', 'danger')
         return redirect(url_for('admin.student_list'))
     except Exception as e:
-        flash(f'Error resetting sessions: {str(e)}', 'danger')
+        flash(f'Error resetting session counts: {str(e)}', 'danger')
         return redirect(url_for('admin.student_list'))
 
 @student_bp.route('/reset_session/<idno>', methods=['POST'])
@@ -162,13 +174,36 @@ def reset_session(idno):
         return redirect(url_for('auth.login'))
     
     try:
-        # Reset session count and sit-in history for the student
+        # Only reset session count for the student
         success = reset_student_session(idno)
         if success:
-            flash('Session count and sit-in history reset successfully!', 'success')
+            flash('Session count reset successfully!', 'success')
         else:
-            flash('Failed to reset session count or sit-in history.', 'danger')
+            flash('Failed to reset session count.', 'danger')
         return redirect(url_for('admin.student_list'))
     except Exception as e:
         flash(f'Error resetting session count: {str(e)}', 'danger')
         return redirect(url_for('admin.student_list'))
+
+@student_bp.route('/admin_end_session/<idno>', methods=['POST'])
+def admin_end_session(idno):
+    if session.get('user_type') != 'admin':
+        flash("Admin access required.", "danger")
+        return redirect(url_for('auth.login'))
+    try:
+        # End the session in sit_in_records
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE sit_in_records
+            SET logout_time = datetime('now', 'localtime')
+            WHERE id_number = ? AND logout_time IS NULL
+        """, (idno,))
+        conn.commit()
+        conn.close()
+        # Copy the ended session to sit_in_history
+        insert_sit_in_history_from_record(idno)
+        flash('Session ended and history updated.', 'success')
+    except Exception as e:
+        flash(f'Error ending session: {str(e)}', 'danger')
+    return redirect(url_for('admin.student_list'))
