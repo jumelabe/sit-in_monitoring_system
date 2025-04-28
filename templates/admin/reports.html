@@ -48,6 +48,40 @@
     .table-responsive {
         overflow-x: auto;
         max-height: calc(100vh - 400px);
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(74, 53, 153, 0.07);
+        padding: 0;
+    }
+    #reportsTable {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        background: #fff;
+        border-radius: 12px;
+        overflow: hidden;
+        font-size: 15px;
+    }
+    #reportsTable th {
+        background: #4A3599;
+        color: #fff;
+        font-weight: 600;
+        border: none;
+        padding: 16px 14px;
+        text-align: center;
+        letter-spacing: 0.5px;
+    }
+    #reportsTable td {
+        background: #fff;
+        color: #333;
+        border-top: 1px solid #eee;
+        padding: 14px 12px;
+        text-align: center;
+        vertical-align: middle;
+    }
+    #reportsTable tbody tr:hover {
+        background: #f6f3fd;
+        transition: background 0.2s;
     }
     .stats-card {
         background: white;

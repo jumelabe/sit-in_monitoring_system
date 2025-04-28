@@ -110,28 +110,32 @@
             border-spacing: 0;
             margin-top: 20px;
             font-size: 15px;
+            background: #fff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(74, 53, 153, 0.07);
         }
-
         #studentTable th {
-            background-color: #2c3e50;
-            color: white;
-            padding: 15px;
+            background-color: #4A3599;
+            color: #fff;
+            padding: 16px 14px;
             text-align: center;
             font-weight: 600;
-            white-space: nowrap;
+            border: none;
+            letter-spacing: 0.5px;
         }
-
         #studentTable td {
-            padding: 12px 15px;
+            padding: 14px 12px;
             text-align: center;
             vertical-align: middle;
+            color: #333;
+            background: #fff;
+            border-top: 1px solid #eee;
         }
-
         #studentTable tbody tr:hover {
-            background-color: #f5f6fa;
-            transition: background-color 0.3s ease;
+            background-color: #f6f3fd;
+            transition: background-color 0.2s;
         }
-
         #searchInput {
             max-width: 400px;
             margin: 0 auto 20px;
@@ -359,32 +363,27 @@
 
         .action-btn {
             padding: 6px 12px;
-            border-radius: 4px;
+            border-radius: 6px;
             border: none;
             font-size: 14px;
             display: flex;
             align-items: center;
             gap: 5px;
-            transition: all 0.2s ease;
-        }
-
-        .action-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: background 0.2s;
         }
 
         .btn-remove {
             background-color: #dc3545;
-            color: white;
+            color: #fff;
+        }
+
+        .btn-remove:hover {
+            background-color: #b52a37;
         }
 
         .btn-reset {
             background-color: #ddd4fc;
             color: #333;
-        }
-
-        .btn-remove:hover {
-            background-color: #c82333;
         }
 
         .btn-reset:hover {
@@ -755,7 +754,7 @@
         function confirmResetSession(studentId) {
             const resetModal = new bootstrap.Modal(document.getElementById('resetSessionModal'));
             const resetForm = document.getElementById('resetSessionForm');
-            resetForm.action = `/reset_session/${studentId}`;
+            resetForm.action = `/admin/reset_session/${studentId}`;
             resetModal.show();
         }
 
@@ -793,5 +792,4 @@
             .catch(error => console.error('Error fetching chart data:', error));
     </script>
 </body>
-</html>
 {% endblock %}

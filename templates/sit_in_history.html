@@ -1,7 +1,5 @@
 {% extends 'base.html' %}
-
 {% block title %}{% endblock %}
-
 {% block content %}
 <div class="dashboard-container">
     <div class="sidebar">
@@ -78,6 +76,7 @@
                                     </h5>
                                 </div>
                                 <form action="{{ url_for('student.submit_feedback') }}" method="POST" class="feedback-form">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                     <div class="modal-body">
                                         <input type="hidden" name="history_id" value="{{ record.id }}">
                                         <div class="session-details mb-4">

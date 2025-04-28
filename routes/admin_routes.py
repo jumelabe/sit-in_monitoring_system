@@ -1,12 +1,6 @@
 from flask import Blueprint, request, render_template, redirect, url_for, flash, session, jsonify, send_file, make_response
 from flask_wtf.csrf import CSRFProtect
-from dbhelper import (
-    get_announcements, insert_announcement, update_announcement, delete_announcement,
-    get_student_count, get_current_sit_in_count, get_total_sit_in_count,
-    get_sit_in_purposes_stats, get_students, get_current_sit_ins, get_sit_in_records,
-    get_reports, get_labs, get_purposes, get_feedbacks, reset_all_active_sessions,
-    get_connection, get_filtered_reports, get_export_data, get_student_by_id, add_reward_point
-)
+from dbhelper import *
 from datetime import datetime
 import csv
 import pandas as pd
@@ -258,11 +252,19 @@ def reset_all_sessions():
         return redirect(url_for('auth.login'))
     
     try:
+        # Now resets both session counts, leaderboard points, and sit-in history
         success = reset_all_active_sessions()
+        # --- Remove all sit-in history records for all students ---
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM sit_in_records")
+        conn.commit()
+        conn.close()
+        # ----------------------------------------------------------
         if success:
-            flash('All sessions have been reset successfully!', 'success')
+            flash('All sessions, leaderboards, and sit-in histories have been reset successfully!', 'success')
         else:
-            flash('Failed to reset sessions.', 'danger')
+            flash('Failed to reset sessions, leaderboards, or sit-in histories.', 'danger')
         return redirect(url_for('admin.student_list'))
     except Exception as e:
         flash(f'Error resetting sessions: {str(e)}', 'danger')
@@ -417,24 +419,23 @@ def reset_session(idno):
         return redirect(url_for('auth.login'))
     
     try:
+        # Now resets both session count, leaderboard points, and sit-in history for the student
+        success = reset_student_session(idno)
+        # --- Remove sit-in history records for this student ---
         conn = get_connection()
         cursor = conn.cursor()
-        
-        # Reset student's session count to 30
-        cursor.execute("""
-            UPDATE students 
-            SET session_count = 30
-            WHERE idno = ?
-        """, (idno,))
-        
+        cursor.execute("DELETE FROM sit_in_records WHERE id_number = ?", (idno,))
         conn.commit()
-        flash('Session count reset successfully!', 'success')
+        conn.close()
+        # ------------------------------------------------------
+        if success:
+            flash('Session count, leaderboard points, and sit-in history reset successfully!', 'success')
+        else:
+            flash('Failed to reset session count, leaderboard points, or sit-in history.', 'danger')
         return redirect(url_for('admin.student_list'))
     except Exception as e:
         flash(f'Error resetting session count: {str(e)}', 'danger')
         return redirect(url_for('admin.student_list'))
-    finally:
-        conn.close()
 
 @admin_bp.route('/export-reports/<format>', methods=['GET'])
 def export_reports(format):
@@ -546,17 +547,12 @@ def leaderboards():
         flash("Admin access required.", "danger")
         return redirect(url_for('auth.login'))
 
-    # Get students ordered by reward points
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT idno, firstname, lastname, course, year_level, 
-               COALESCE(reward_points, 0) as reward_points
-        FROM students 
-        ORDER BY reward_points DESC, lastname ASC
-        LIMIT 50
-    """)
-    leaderboard_data = cursor.fetchall()
-    conn.close()
+    # Use combined leaderboard (top 5 by sit-in count and reward points)
+    leaderboard_data = get_combined_leaderboard_students(limit=5)
+    print("DEBUG: leaderboard_data length =", len(leaderboard_data))
+    print("DEBUG: leaderboard_data =", leaderboard_data)
 
-    return render_template('admin/leaderboards.html', leaderboard_data=leaderboard_data)
+    return render_template(
+        'admin/leaderboards.html',
+        leaderboard_data=leaderboard_data
+    )

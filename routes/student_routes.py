@@ -1,11 +1,12 @@
 from flask import Blueprint, request, render_template, redirect, url_for, flash, session
-from flask_wtf.csrf import CSRFProtect
+from flask_wtf.csrf import CSRFProtect, generate_csrf
 from werkzeug.utils import secure_filename
 from datetime import datetime
 import os
-from dbhelper import get_student_by_id, update_student_profile, get_announcements
+from dbhelper import *
 
 student_bp = Blueprint('student', __name__, url_prefix='/student')
+csrf = CSRFProtect()
 
 @student_bp.route('/dashboard')
 def dashboard():
@@ -81,12 +82,12 @@ def sit_in_history():
         session.clear()
         return redirect(url_for('auth.login'))
     
-    # Get student's sit-in history from database
     student_id = session.get('user_id')
-    # TODO: Add database function to get history
-    history = []  # Replace with actual database query
-    
-    return render_template('sit_in_history.html', history=history)
+    history = get_sit_in_history_by_student(student_id)
+    history = [dict(row) for row in history]
+    # Pass CSRF token to template for feedback form
+    csrf_token = generate_csrf()
+    return render_template('sit_in_history.html', history=history, csrf_token=csrf_token)
 
 @student_bp.route('/reserve', methods=['GET', 'POST'])
 def reserve():
@@ -120,6 +121,7 @@ def submit_feedback():
     if session.get('user_type') != 'student':
         return redirect(url_for('auth.login'))
     
+    # CSRF is automatically checked by Flask-WTF
     history_id = request.form.get('history_id')
     feedback = request.form.get('feedback')
     
@@ -127,6 +129,46 @@ def submit_feedback():
         flash('Invalid feedback submission', 'error')
         return redirect(url_for('student.sit_in_history'))
     
-    # TODO: Add database function to save feedback
-    flash('Feedback submitted successfully!', 'success')
+    user_id = session.get('user_id')
+    success = insert_feedback(history_id, feedback, user_id)
+    if success:
+        flash('Feedback submitted successfully!', 'success')
+    else:
+        flash('Failed to submit feedback.', 'danger')
     return redirect(url_for('student.sit_in_history'))
+
+@student_bp.route('/reset_all_sessions', methods=['POST'])
+def reset_all_sessions():
+    if session.get('user_type') != 'admin':
+        flash("Admin access required.", "danger")
+        return redirect(url_for('auth.login'))
+    
+    try:
+        # Reset all active sessions and sit-in history
+        success = reset_all_active_sessions()
+        if success:
+            flash('All sessions and sit-in histories have been reset successfully!', 'success')
+        else:
+            flash('Failed to reset sessions or sit-in histories.', 'danger')
+        return redirect(url_for('admin.student_list'))
+    except Exception as e:
+        flash(f'Error resetting sessions: {str(e)}', 'danger')
+        return redirect(url_for('admin.student_list'))
+
+@student_bp.route('/reset_session/<idno>', methods=['POST'])
+def reset_session(idno):
+    if session.get('user_type') != 'admin':
+        flash("Admin access required.", "danger")
+        return redirect(url_for('auth.login'))
+    
+    try:
+        # Reset session count and sit-in history for the student
+        success = reset_student_session(idno)
+        if success:
+            flash('Session count and sit-in history reset successfully!', 'success')
+        else:
+            flash('Failed to reset session count or sit-in history.', 'danger')
+        return redirect(url_for('admin.student_list'))
+    except Exception as e:
+        flash(f'Error resetting session count: {str(e)}', 'danger')
+        return redirect(url_for('admin.student_list'))
