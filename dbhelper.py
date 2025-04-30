@@ -891,3 +891,90 @@ def get_combined_leaderboard_students(limit=5):
     finally:
         print("Closing connection for get_combined_leaderboard_students.") # DEBUG
         conn.close()
+
+def ensure_resource_table():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS resources (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            description TEXT,
+            file_name TEXT,
+            url TEXT,
+            uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    # Try to add 'enabled' column if it does not exist
+    try:
+        cursor.execute("ALTER TABLE resources ADD COLUMN enabled INTEGER DEFAULT 1")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+    conn.close()
+
+def insert_resource(title, description, file_name=None, url=None):
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO resources (title, description, file_name, url, enabled) VALUES (?, ?, ?, ?, 1)",
+            (title, description, file_name, url)
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error inserting resource: {e}")
+        return False
+    finally:
+        conn.close()
+
+def get_all_resources(enabled_only=False):
+    conn = get_connection()
+    cursor = conn.cursor()
+    # Defensive: ensure 'enabled' column exists
+    try:
+        cursor.execute("SELECT enabled FROM resources LIMIT 1")
+    except sqlite3.OperationalError:
+        try:
+            cursor.execute("ALTER TABLE resources ADD COLUMN enabled INTEGER DEFAULT 1")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
+    if enabled_only:
+        cursor.execute("SELECT id, title, description, file_name, url, uploaded_at, enabled FROM resources WHERE enabled = 1 ORDER BY uploaded_at DESC")
+    else:
+        cursor.execute("SELECT id, title, description, file_name, url, uploaded_at, enabled FROM resources ORDER BY uploaded_at DESC")
+    resources = cursor.fetchall()
+    conn.close()
+    return resources
+
+def set_resource_enabled(resource_id, enabled):
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("UPDATE resources SET enabled = ? WHERE id = ?", (1 if enabled else 0, resource_id))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error updating resource enabled status: {e}")
+        return False
+    finally:
+        conn.close()
+
+def delete_resource(resource_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        # Optionally, fetch file_name before deleting for file removal
+        cursor.execute("SELECT file_name FROM resources WHERE id = ?", (resource_id,))
+        row = cursor.fetchone()
+        file_name = row[0] if row else None
+        cursor.execute("DELETE FROM resources WHERE id = ?", (resource_id,))
+        conn.commit()
+        return file_name
+    except Exception as e:
+        print(f"Error deleting resource: {e}")
+        return None
+    finally:
+        conn.close()

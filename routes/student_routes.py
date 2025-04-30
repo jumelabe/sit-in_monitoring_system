@@ -215,11 +215,9 @@ def resources():
     if session.get('user_type') != 'student':
         session.clear()
         return redirect(url_for('auth.login'))
-    # List all files in the resources upload folder
-    files = []
-    if os.path.exists(RESOURCE_UPLOAD_FOLDER):
-        files = os.listdir(RESOURCE_UPLOAD_FOLDER)
-    return render_template('resources.html', files=files)
+    # Fetch only enabled resources from the database
+    resources = get_all_resources(enabled_only=True)
+    return render_template('resources.html', resources=resources)
 
 @student_bp.route('/resources/download/<filename>')
 def download_resource(filename):

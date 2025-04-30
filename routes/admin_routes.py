@@ -9,12 +9,13 @@ import xlsxwriter
 from xhtml2pdf import pisa
 import os
 from werkzeug.utils import secure_filename
+import sqlite3
 
 UPLOAD_FOLDER = os.path.join(os.getcwd(), 'uploads', 'resources')
 ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'txt', 'zip', 'rar', 'jpg', 'png'}
 
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
+# Ensure upload folder exists at runtime
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -580,25 +581,69 @@ def admin_resources():
 
     upload_error = None
     if request.method == 'POST':
+        title = request.form.get('title', '').strip()
+        description = request.form.get('description', '').strip()
+        url_link = request.form.get('resource_url', '').strip()
         file = request.files.get('resource_file')
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            file.save(os.path.join(UPLOAD_FOLDER, filename))
-            flash('Resource uploaded successfully!', 'success')
+
+        if not title:
+            upload_error = 'Title is required.'
+        elif not (file and file.filename) and not url_link:
+            upload_error = 'Please provide a file or a URL.'
+        elif (file and file.filename) and url_link:
+            upload_error = 'Please provide only one: file or URL.'
+        elif file and file.filename:
+            if allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                file_path = os.path.join(UPLOAD_FOLDER, filename)
+                # Ensure unique filename
+                counter = 1
+                base, ext = os.path.splitext(filename)
+                while os.path.exists(file_path):
+                    filename = f"{base}_{counter}{ext}"
+                    file_path = os.path.join(UPLOAD_FOLDER, filename)
+                    counter += 1
+                file.save(file_path)
+                insert_resource(title, description, filename, None)
+                flash('Resource uploaded successfully!', 'success')
+                return redirect(url_for('admin.admin_resources'))
+            else:
+                upload_error = 'Invalid file type.'
+        elif url_link:
+            insert_resource(title, description, None, url_link)
+            flash('Resource link added successfully!', 'success')
             return redirect(url_for('admin.admin_resources'))
-        else:
-            upload_error = 'Invalid file type or no file selected.'
 
-    # List uploaded files
-    files = []
-    for fname in os.listdir(UPLOAD_FOLDER):
-        files.append(fname)
-
+    resources = get_all_resources()
     return render_template(
         'admin/admin_resources.html',
-        files=files,
+        resources=resources,
         upload_error=upload_error
     )
+
+@admin_bp.route('/resources/enable/<int:resource_id>', methods=['POST'])
+def enable_resource(resource_id):
+    if session.get('user_type') != 'admin':
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    enabled = request.form.get('enabled', '1') == '1'
+    set_resource_enabled(resource_id, enabled)
+    return redirect(url_for('admin.admin_resources'))
+
+@admin_bp.route('/resources/delete/<int:resource_id>', methods=['POST'])
+def delete_resource_route(resource_id):
+    if session.get('user_type') != 'admin':
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    file_name = delete_resource(resource_id)
+    # Optionally, remove file from disk if it exists
+    if file_name:
+        file_path = os.path.join(UPLOAD_FOLDER, file_name)
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except Exception as e:
+                print(f"Error deleting file: {e}")
+    flash('Resource deleted successfully!', 'success')
+    return redirect(url_for('admin.admin_resources'))
 
 @admin_bp.route('/resources/download/<filename>')
 def download_resource(filename):
@@ -609,3 +654,10 @@ def download_resource(filename):
         os.path.join(UPLOAD_FOLDER, filename),
         as_attachment=True
     )
+
+# --- Student resources view ---
+@admin_bp.route('/student/resources')
+def student_resources():
+    # No login required or check for student session if needed
+    resources = get_all_resources()
+    return render_template('student/resources.html', resources=resources)
