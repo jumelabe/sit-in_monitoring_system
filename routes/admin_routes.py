@@ -7,6 +7,17 @@ import pandas as pd
 from io import BytesIO
 import xlsxwriter
 from xhtml2pdf import pisa
+import os
+from werkzeug.utils import secure_filename
+
+UPLOAD_FOLDER = os.path.join(os.getcwd(), 'uploads', 'resources')
+ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'txt', 'zip', 'rar', 'jpg', 'png'}
+
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # Change Blueprint registration to include url_prefix
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
@@ -559,4 +570,42 @@ def leaderboards():
     return render_template(
         'admin/leaderboards.html',
         leaderboard_data=leaderboard_data
+    )
+
+@admin_bp.route('/resources', methods=['GET', 'POST'])
+def admin_resources():
+    if session.get('user_type') != 'admin':
+        flash("Admin access required.", "danger")
+        return redirect(url_for('auth.login'))
+
+    upload_error = None
+    if request.method == 'POST':
+        file = request.files.get('resource_file')
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            file.save(os.path.join(UPLOAD_FOLDER, filename))
+            flash('Resource uploaded successfully!', 'success')
+            return redirect(url_for('admin.admin_resources'))
+        else:
+            upload_error = 'Invalid file type or no file selected.'
+
+    # List uploaded files
+    files = []
+    for fname in os.listdir(UPLOAD_FOLDER):
+        files.append(fname)
+
+    return render_template(
+        'admin/admin_resources.html',
+        files=files,
+        upload_error=upload_error
+    )
+
+@admin_bp.route('/resources/download/<filename>')
+def download_resource(filename):
+    if session.get('user_type') != 'admin':
+        flash("Admin access required.", "danger")
+        return redirect(url_for('auth.login'))
+    return send_file(
+        os.path.join(UPLOAD_FOLDER, filename),
+        as_attachment=True
     )

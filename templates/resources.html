@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}{% endblock %}
+
+{% block content %}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="static/styles.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="sidebar">
+            <h1 class="dashboard-title">Resources</h1>
+            <a href="{{ url_for('student.dashboard') }}" class="menu-btn">Dashboard</a>
+            <a href="{{ url_for('student.sit_in_history') }}" class="menu-btn">Sit-In History</a>
+            <a href="{{ url_for('student.reserve') }}" class="menu-btn">Reservation</a>
+            <a href="{{ url_for('student.announcements') }}" class="menu-btn">Announcement</a>
+            <a href="{{ url_for('student.resources') }}" class="menu-btn active">Resources</a>
+            <a href="{{ url_for('auth.logout') }}" class="menu-btn logout-btn">Logout</a>
+        </div>
+    <div class="container" style="max-width: 700px; margin: 40px auto;">
+    <div class="card" style="padding: 32px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+        <h2 class="mb-4" style="font-weight: 600; color: #2c3e50; text-align: center;">Lab Resources</h2>
+        <ul class="list-group mt-2" style="max-height: 350px; overflow-y: auto;">
+            {% for file in files %}
+                <li class="list-group-item d-flex justify-content-between align-items-center"
+                    style="border: none; border-bottom: 1px solid #eee;">
+                    <span style="word-break: break-all;">
+                        <i class="bi bi-file-earmark" style="margin-right: 8px; color: #6c757d;"></i>
+                        {{ file }}
+                    </span>
+                    <a href="{{ url_for('student.download_resource', filename=file) }}"
+                       class="btn btn-outline-success btn-sm" title="Download">
+                        <i class="bi bi-download"></i> Download
+                    </a>
+                </li>
+            {% else %}
+                <li class="list-group-item text-muted" style="border: none;">No resources available yet.</li>
+            {% endfor %}
+        </ul>
+    </div>
+    </div>
+</body>
+{% endblock %}

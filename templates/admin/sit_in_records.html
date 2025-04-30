@@ -9,6 +9,94 @@
     <title>Sit-in Records</title>
     <link rel="stylesheet" href="static/styles.css">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="sidebar">
+            <h1 class="dashboard-title">Sit-in Records</h1>
+            <a href="{{ url_for('admin.admin_dashboard') }}" class="menu-btn">Dashboard</a>
+            <a href="{{ url_for('admin.student_list') }}" class="menu-btn">Student List</a>
+            <a href="{{ url_for('admin.current_sit_in') }}" class="menu-btn">Current Sit-in</a>
+            <a href="{{ url_for('admin.sit_in_records') }}" class="menu-btn active">Sit-in Records</a>
+            <a href="{{ url_for('admin.reports') }}" class="menu-btn">Reports</a>
+            <a href="{{ url_for('admin.feedback_reports') }}" class="menu-btn">View Feedback</a>
+            <a href="{{ url_for('admin.leaderboards') }}" class="menu-btn">Leaderboards</a>
+            <a href="{{ url_for('admin.admin_resources') }}" class="menu-btn">Resources</a>
+            <a href="{{ url_for('admin.logout') }}" class="menu-btn logout-btn">Logout</a>
+        </div>
+        
+        <div class="content">
+            <div class="container mt-4">
+                <div class="header-container">
+                    <h2>Sit-in Records</h2>
+                    <div class="search-container">
+                        <input type="text" class="search-input" placeholder="Search records..." id="searchInput" onkeyup="searchTable()">
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>ID Number</th>
+                                <th>Name</th>
+                                <th>Purpose</th>
+                                <th>Laboratory</th>
+                                <th>Login Time & Date</th>
+                                <th>Logout Time & Date</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for record in records %}
+                            <tr>
+                                <td>{{ record.id_number }}</td>
+                                <td>{{ record.name }}</td>
+                                <td>{{ record.purpose }}</td>
+                                <td>{{ record.lab }}</td>
+                                <td>{{ record.login_time }}</td>
+                                <td>{{ record.logout_time }}</td>
+                                <td>
+                                    {% if record.logout_time == 'Active' %}
+                                        <span class="badge bg-success">Active</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Completed</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function searchTable() {
+            const input = document.getElementById('searchInput');
+            const filter = input.value.toLowerCase();
+            const table = document.querySelector('.table');
+            const rows = table.getElementsByTagName('tr');
+
+            for (let i = 1; i < rows.length; i++) {
+                const cells = rows[i].getElementsByTagName('td');
+                let found = false;
+                
+                for (let j = 0; j < cells.length; j++) {
+                    const cell = cells[j];
+                    if (cell) {
+                        const text = cell.textContent || cell.innerText;
+                        if (text.toLowerCase().indexOf(filter) > -1) {
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                
+                rows[i].style.display = found ? '' : 'none';
+            }
+        }
+    </script>
     <style>
         .table-responsive {
             background: #fff;
@@ -85,92 +173,5 @@
             box-shadow: 0 0 5px rgba(44, 62, 80, 0.2);
         }
     </style>
-</head>
-<body>
-    <div class="dashboard-container">
-        <div class="sidebar">
-            <h1 class="dashboard-title">Sit-in Records</h1>
-            <a href="{{ url_for('admin.admin_dashboard') }}" class="menu-btn">Dashboard</a>
-            <a href="{{ url_for('admin.student_list') }}" class="menu-btn">Student List</a>
-            <a href="{{ url_for('admin.current_sit_in') }}" class="menu-btn">Current Sit-in</a>
-            <a href="{{ url_for('admin.sit_in_records') }}" class="menu-btn active">Sit-in Records</a>
-            <a href="{{ url_for('admin.reports') }}" class="menu-btn">Reports</a>
-            <a href="{{ url_for('admin.feedback_reports') }}" class="menu-btn">View Feedback</a>
-            <a href="{{ url_for('admin.leaderboards') }}" class="menu-btn">Leaderboards</a>
-            <a href="{{ url_for('admin.logout') }}" class="menu-btn logout-btn">Logout</a>
-        </div>
-        
-        <div class="content">
-            <div class="container mt-4">
-                <div class="header-container">
-                    <h2>Sit-in Records</h2>
-                    <div class="search-container">
-                        <input type="text" class="search-input" placeholder="Search records..." id="searchInput" onkeyup="searchTable()">
-                    </div>
-                </div>
-                <div class="table-responsive">
-                    <table class="table table-striped table-hover">
-                        <thead class="table-dark">
-                            <tr>
-                                <th>ID Number</th>
-                                <th>Name</th>
-                                <th>Purpose</th>
-                                <th>Laboratory</th>
-                                <th>Login Time & Date</th>
-                                <th>Logout Time & Date</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for record in records %}
-                            <tr>
-                                <td>{{ record.id_number }}</td>
-                                <td>{{ record.name }}</td>
-                                <td>{{ record.purpose }}</td>
-                                <td>{{ record.lab }}</td>
-                                <td>{{ record.login_time }}</td>
-                                <td>{{ record.logout_time }}</td>
-                                <td>
-                                    {% if record.logout_time == 'Active' %}
-                                        <span class="badge bg-success">Active</span>
-                                    {% else %}
-                                        <span class="badge bg-secondary">Completed</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        function searchTable() {
-            const input = document.getElementById('searchInput');
-            const filter = input.value.toLowerCase();
-            const table = document.querySelector('.table');
-            const rows = table.getElementsByTagName('tr');
-
-            for (let i = 1; i < rows.length; i++) {
-                const cells = rows[i].getElementsByTagName('td');
-                let found = false;
-                
-                for (let j = 0; j < cells.length; j++) {
-                    const cell = cells[j];
-                    if (cell) {
-                        const text = cell.textContent || cell.innerText;
-                        if (text.toLowerCase().indexOf(filter) > -1) {
-                            found = true;
-                            break;
-                        }
-                    }
-                }
-                
-                rows[i].style.display = found ? '' : 'none';
-            }
-        }
-    </script>
 </body>
 {% endblock %}

@@ -1,0 +1,60 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Lab Resources{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="sidebar">
+        <h1 class="dashboard-title">Resources</h1>
+        <a href="{{ url_for('admin.admin_dashboard') }}" class="menu-btn">Dashboard</a>
+        <a href="{{ url_for('admin.student_list') }}" class="menu-btn">Student List</a>
+        <a href="{{ url_for('admin.current_sit_in') }}" class="menu-btn">Current Sit-in</a>
+        <a href="{{ url_for('admin.sit_in_records') }}" class="menu-btn">Sit-in Records</a>
+        <a href="{{ url_for('admin.reports') }}" class="menu-btn">Reports</a>
+        <a href="{{ url_for('admin.feedback_reports') }}" class="menu-btn">View Feedback</a>
+        <a href="{{ url_for('admin.leaderboards') }}" class="menu-btn">Leaderboards</a>
+        <a href="{{ url_for('admin.admin_resources') }}" class="menu-btn active">Resources</a>
+        <a href="{{ url_for('admin.logout') }}" class="menu-btn logout-btn">Logout</a>
+    </div>
+    <div class="main-content" style="display: flex; justify-content: center; align-items: flex-start; min-height: 80vh;">
+        <div class="card"
+             style="width: 100%; max-width: 600px; margin: 40px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-radius: 10px; padding: 32px;">
+            <h2 class="mb-4" style="font-weight: 600; color: #2c3e50; text-align: center;">Upload Lab Resource/Material</h2>
+            <form method="post" enctype="multipart/form-data" class="mb-4"
+                  style="display: flex; flex-direction: row; gap: 10px; align-items: center; justify-content: center;">
+                <input type="file" name="resource_file" required class="form-control" style="flex:2;">
+                <button type="submit" class="btn btn-primary" style="min-width: 120px; flex:1;">Upload</button>
+            </form>
+            {% if upload_error %}
+                <div class="alert alert-danger">{{ upload_error }}</div>
+            {% endif %}
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} mt-2">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <h3 class="mt-4" style="font-size: 1.2rem; font-weight: 500; text-align: center;">Available Resources</h3>
+            <ul class="list-group mt-2" style="max-height: 300px; overflow-y: auto;">
+                {% for file in files %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center"
+                        style="border: none; border-bottom: 1px solid #eee;">
+                        <span style="word-break: break-all;">
+                            <i class="bi bi-file-earmark" style="margin-right: 8px; color: #6c757d;"></i>
+                            {{ file }}
+                        </span>
+                        <a href="{{ url_for('admin.download_resource', filename=file) }}"
+                           class="btn btn-outline-success btn-sm" title="Download">
+                            <i class="bi bi-download"></i> Download
+                        </a>
+                    </li>
+                {% else %}
+                    <li class="list-group-item text-muted" style="border: none;">No resources uploaded yet.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

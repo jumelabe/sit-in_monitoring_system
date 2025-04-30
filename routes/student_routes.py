@@ -1,4 +1,4 @@
-from flask import Blueprint, request, render_template, redirect, url_for, flash, session
+from flask import Blueprint, request, render_template, redirect, url_for, flash, session, send_file
 from flask_wtf.csrf import CSRFProtect, generate_csrf
 from werkzeug.utils import secure_filename
 from datetime import datetime
@@ -8,6 +8,8 @@ from dbhelper import insert_sit_in_history_from_record
 
 student_bp = Blueprint('student', __name__, url_prefix='/student')
 csrf = CSRFProtect()
+
+RESOURCE_UPLOAD_FOLDER = os.path.join(os.getcwd(), 'uploads', 'resources')
 
 @student_bp.route('/dashboard')
 def dashboard():
@@ -207,3 +209,24 @@ def admin_end_session(idno):
     except Exception as e:
         flash(f'Error ending session: {str(e)}', 'danger')
     return redirect(url_for('admin.student_list'))
+
+@student_bp.route('/resources')
+def resources():
+    if session.get('user_type') != 'student':
+        session.clear()
+        return redirect(url_for('auth.login'))
+    # List all files in the resources upload folder
+    files = []
+    if os.path.exists(RESOURCE_UPLOAD_FOLDER):
+        files = os.listdir(RESOURCE_UPLOAD_FOLDER)
+    return render_template('resources.html', files=files)
+
+@student_bp.route('/resources/download/<filename>')
+def download_resource(filename):
+    if session.get('user_type') != 'student':
+        session.clear()
+        return redirect(url_for('auth.login'))
+    return send_file(
+        os.path.join(RESOURCE_UPLOAD_FOLDER, filename),
+        as_attachment=True
+    )
