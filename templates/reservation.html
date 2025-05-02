@@ -14,24 +14,55 @@
         <a href="{{ url_for('auth.logout') }}" class="menu-btn logout-btn">Logout</a>
     </div>
 
-    <div class="content-container">
-        <div class="form-wrapper">
-            <h2 class="form-header">Reserve a Lab Session</h2>
+    <div class="content" style="flex:1;">
+        <div style="padding: 32px 32px 0 32px;">
+            <h2 class="section-title"><i class="fas fa-calendar-plus"></i> Reserve a Lab Session</h2>
+        </div>
+        <div class="content-container">
             {% if success_message %}
             <div class="success-message">{{ success_message }}</div>
             {% endif %}
             <form action="{{ url_for('student.reserve') }}" method="POST" class="reservation-form">
+                {% if csrf_token %}
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() if csrf_token is callable else csrf_token }}">
+                {% endif %}
+
                 <label for="id_number">ID Number:</label>
                 <input type="text" id="id_number" name="id_number" value="{{ id_number }}" readonly>
 
                 <label for="student_name">Student Name:</label>
                 <input type="text" id="student_name" name="student_name" value="{{ student_name }}" readonly>
 
-                <label for="purpose">Purpose:</label>
-                <input type="text" id="purpose" name="purpose" required>
+                <label for="purpose" class="form-label">Purpose <span class="text-danger">*</span></label>
+                <select class="form-select custom-select" id="purpose" name="purpose" required>
+                    <option value="" disabled selected>Select purpose...</option>
+                    <option value="C">C Programming</option>
+                    <option value="Java">Java Programming</option>
+                    <option value="Python">Python Programming</option>
+                    <option value="C#">C# Programming</option>
+                    <option value="Database">Database</option>
+                    <option value="Digital Logic">Digital Logic & Design</option>
+                    <option value="Embedded Systems">Embedded Systems & IoT</option>
+                    <option value="System Integration">System Integration & Architecture</option>
+                    <option value="Computer Application">Computer Application</option>
+                    <option value="Project Management">Project Management</option>
+                    <option value="IT Trends">IT Trends</option>
+                    <option value="Technopreneurship">Technopreneurship</option>
+                    <option value="Capstone">Capstone</option>
+                </select>
+                <div class="invalid-feedback">Please select a purpose.</div>
 
-                <label for="lab">Lab:</label>
-                <input type="text" id="lab" name="lab" required>
+                <label for="laboratory">Lab:</label>
+                <select class="form-select custom-select" id="laboratory" name="laboratory" required>
+                    <option value="" disabled selected>Select laboratory room...</option>
+                    <option value="524">Room 524 - Computer Laboratory</option>
+                    <option value="526">Room 526 - Computer Laboratory</option>
+                    <option value="527">Room 527 - Computer Laboratory</option>
+                    <option value="530">Room 530 - Computer Laboratory</option>
+                    <option value="542">Room 542 - Computer Laboratory</option>
+                    <option value="544">Room 544 - Computer Laboratory</option>
+                    <option value="517">Room 517 - Computer Laboratory</option>
+                </select>
 
                 <label for="time_in">Time In:</label>
                 <input type="time" id="time_in" name="time_in" required>
@@ -44,6 +75,7 @@
 
                 <button type="submit" class="btn btn-primary" {% if remaining_session == 0 %}disabled{% endif %}>
                     Reserve Now
+                </button>
             </form>
         </div>
     </div>

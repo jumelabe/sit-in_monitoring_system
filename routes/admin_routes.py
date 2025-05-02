@@ -285,18 +285,17 @@ def reset_all_sessions():
     if session.get('user_type') != 'admin':
         flash("Admin access required.", "danger")
         return redirect(url_for('auth.login'))
-    
+
     try:
-        # Only reset session counts for all students
         success = reset_all_active_sessions()
         if success:
-            flash('All students\' session counts have been reset successfully!', 'success')
+            flash('All sessions have been reset successfully!', 'success')
         else:
-            flash('Failed to reset session counts.', 'danger')
-        return redirect(url_for('admin.student_list'))
+            flash('Error resetting data: Could not reset all sessions.', 'danger')
     except Exception as e:
-        flash(f'Error resetting session counts: {str(e)}', 'danger')
-        return redirect(url_for('admin.student_list'))
+        flash(f'Error resetting data: {str(e)}', 'danger')
+
+    return redirect(url_for('admin.student_list'))
 
 @admin_bp.route('/end_session', methods=['POST'])
 def end_session():
@@ -332,6 +331,15 @@ def end_session():
             WHERE id_number = ? AND logout_time IS NULL
         """, (id_number,))
         
+        # Deduct 1 session count
+        cursor.execute("""
+            UPDATE students SET session_count = CASE
+                WHEN session_count > 0 THEN session_count - 1
+                ELSE 0
+            END
+            WHERE idno = ?
+        """, (id_number,))
+
         conn.commit()
 
         # Insert into history
@@ -346,91 +354,10 @@ def end_session():
         
     except Exception as e:
         conn.rollback()
-        print(f"Error in end_session: {e}")  # Debug print
         return jsonify({
             'success': False,
             'message': f'Error ending session: {str(e)}'
         }), 500
-        
-    finally:
-        conn.close()
-
-@admin_bp.route('/get_student/<idno>')  # Changed from /admin/get_student/<idno>
-def get_student(idno):
-    if session.get('user_type') != 'admin':
-        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
-    
-    try:    
-        student = get_student_by_id(idno)
-        if student:
-            return jsonify({
-                'success': True,
-                'idno': student['idno'],
-                'name': f"{student['firstname']} {student['lastname']}",
-                'session_count': student['session_count']
-            })
-        return jsonify({'success': False, 'message': 'Student not found'}), 404
-    except Exception as e:
-        print(f"Error in get_student route: {e}")
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-@admin_bp.route('/sit_in', methods=['POST'])
-def sit_in():
-    if session.get('user_type') != 'admin':
-        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
-    
-    if not request.is_json:
-        return jsonify({'success': False, 'message': 'Invalid request format'}), 400
-        
-    data = request.json
-    idno = data.get('id_number')
-    purpose = data.get('sit_purpose')
-    laboratory = data.get('laboratory')
-    
-    if not all([idno, purpose, laboratory]):
-        return jsonify({'success': False, 'message': 'Missing required fields'}), 400
-    
-    conn = get_connection()
-    cursor = conn.cursor()
-    
-    try:
-        # Check if student already has an active session
-        cursor.execute("""
-            SELECT id_number 
-            FROM sit_in_records 
-            WHERE id_number = ? AND logout_time IS NULL
-        """, (idno,))
-        active_session = cursor.fetchone()
-        
-        if active_session:
-            return jsonify({'success': False, 'message': 'Student already has an active session'}), 400
-
-        # Check if student has any remaining sessions
-        cursor.execute("SELECT session_count FROM students WHERE idno = ?", (idno,))
-        result = cursor.fetchone()
-        if not result or result[0] <= 0:
-            return jsonify({'success': False, 'message': 'No remaining sessions available'}), 400
-            
-        # Get student name
-        cursor.execute("SELECT firstname, lastname FROM students WHERE idno = ?", (idno,))
-        student = cursor.fetchone()
-        if not student:
-            return jsonify({'success': False, 'message': 'Student not found'}), 404
-            
-        student_name = f"{student[0]} {student[1]}"
-        
-        # Create new sit-in record without incrementing session count
-        cursor.execute("""
-            INSERT INTO sit_in_records (id_number, name, purpose, lab, login_time, date)
-            VALUES (?, ?, ?, ?, datetime('now', 'localtime'), date('now'))
-        """, (idno, student_name, purpose, laboratory))
-        
-        conn.commit()
-        return jsonify({'success': True, 'message': 'Sit-in session started successfully'})
-        
-    except Exception as e:
-        conn.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
         
     finally:
         conn.close()
@@ -440,18 +367,17 @@ def reset_session(idno):
     if session.get('user_type') != 'admin':
         flash("Admin access required.", "danger")
         return redirect(url_for('auth.login'))
-    
+
     try:
-        # Only reset session count for the student
         success = reset_student_session(idno)
         if success:
-            flash('Session count reset successfully!', 'success')
+            flash('Student sessions have been reset successfully!', 'success')
         else:
-            flash('Failed to reset session count.', 'danger')
-        return redirect(url_for('admin.student_list'))
+            flash('Error resetting student data: Could not reset student.', 'danger')
     except Exception as e:
-        flash(f'Error resetting session count: {str(e)}', 'danger')
-        return redirect(url_for('admin.student_list'))
+        flash(f'Error resetting student data: {str(e)}', 'danger')
+
+    return redirect(url_for('admin.student_list'))
 
 @admin_bp.route('/export-reports/<format>', methods=['GET'])
 def export_reports(format):
@@ -544,18 +470,67 @@ def reward_student():
     
     if not id_number:
         return jsonify({'success': False, 'message': 'Student ID is required'}), 400
-    
-    success = add_reward_point(id_number)
-    if success:
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        conn.execute("BEGIN TRANSACTION")
+
+        # End the session
+        cursor.execute("""
+            UPDATE sit_in_records 
+            SET logout_time = datetime('now', 'localtime')
+            WHERE id_number = ? AND logout_time IS NULL
+        """, (id_number,))
+
+        # Deduct 1 session count
+        cursor.execute("""
+            UPDATE students SET session_count = CASE
+                WHEN session_count > 0 THEN session_count - 1
+                ELSE 0
+            END
+            WHERE idno = ?
+        """, (id_number,))
+
+        # Add 1 to both reward_points and reward_redeemable
+        cursor.execute("""
+            UPDATE students 
+            SET reward_points = COALESCE(reward_points, 0) + 1,
+                reward_redeemable = COALESCE(reward_redeemable, 0) + 1
+            WHERE idno = ?
+        """, (id_number,))
+
+        # Check if redeemable points reached 3
+        cursor.execute("SELECT reward_redeemable FROM students WHERE idno = ?", (id_number,))
+        redeemable = cursor.fetchone()
+        if redeemable and redeemable[0] >= 3:
+            # Reset redeemable and add 1 session
+            cursor.execute("""
+                UPDATE students 
+                SET reward_redeemable = 0,
+                    session_count = session_count + 1
+                WHERE idno = ?
+            """, (id_number,))
+
+        conn.commit()
+
+        # Insert into history
+        success = insert_sit_in_history_from_record(id_number)
+        if not success:
+            return jsonify({'success': False, 'message': 'Failed to create history record'}), 500
+
         return jsonify({
             'success': True,
             'message': 'Student rewarded and session ended successfully'
         })
-    else:
+    except Exception as e:
+        conn.rollback()
         return jsonify({
             'success': False,
-            'message': 'Failed to add reward point'
+            'message': f'Error: {str(e)}'
         }), 500
+    finally:
+        conn.close()
 
 @admin_bp.route('/leaderboards')
 def leaderboards():
@@ -565,8 +540,6 @@ def leaderboards():
 
     # Use combined leaderboard (top 5 by sit-in count and reward points)
     leaderboard_data = get_combined_leaderboard_students(limit=5)
-    print("DEBUG: leaderboard_data length =", len(leaderboard_data))
-    print("DEBUG: leaderboard_data =", leaderboard_data)
 
     return render_template(
         'admin/leaderboards.html',
@@ -661,3 +634,106 @@ def student_resources():
     # No login required or check for student session if needed
     resources = get_all_resources()
     return render_template('student/resources.html', resources=resources)
+
+@admin_bp.route('/delete_student/<idno>', methods=['POST'])
+def delete_student(idno):
+    if session.get('user_type') != 'admin':
+        flash("Admin access required.", "danger")
+        return redirect(url_for('auth.login'))
+    
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Start transaction
+        conn.execute("BEGIN TRANSACTION")
+        
+        # Delete from sit_in_records
+        cursor.execute("DELETE FROM sit_in_records WHERE id_number = ?", (idno,))
+        
+        # Delete from students
+        cursor.execute("DELETE FROM students WHERE idno = ?", (idno,))
+        
+        conn.commit()
+        flash('Student deleted successfully!', 'success')
+        
+    except Exception as e:
+        conn.rollback()
+        flash(f'Error deleting student: {str(e)}', 'danger')
+        
+    finally:
+        conn.close()
+    
+    return redirect(url_for('admin.student_list'))
+
+@admin_bp.route('/get_student/<idno>')
+def get_student_api(idno):
+    if session.get('user_type') != 'admin':
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    student = get_student_by_id(idno)
+    if not student:
+        return jsonify({'success': False, 'message': 'Student not found'})
+    # Compose full name
+    name = f"{student['firstname']} {student['midname']} {student['lastname']}".strip()
+    return jsonify({
+        'success': True,
+        'idno': student['idno'],
+        'name': name,
+        'session_count': student['session_count']
+    })
+
+@admin_bp.route('/sit_in', methods=['POST'])
+def sit_in_student():
+    if session.get('user_type') != 'admin':
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+
+    # Accept both JSON and form data
+    if request.is_json:
+        data = request.get_json()
+    else:
+        data = request.form
+
+    id_number = data.get('id_number')
+    sit_purpose = data.get('sit_purpose')
+    laboratory = data.get('laboratory')
+
+    if not id_number or not sit_purpose or not laboratory:
+        return jsonify({'success': False, 'message': 'Missing required fields'}), 400
+
+    student = get_student_by_id(id_number)
+    if not student:
+        return jsonify({'success': False, 'message': 'Student not found'}), 404
+
+    # Check if student has remaining sessions
+    session_count = student['session_count']
+    if session_count is not None and int(session_count) <= 0:
+        return jsonify({'success': False, 'message': 'No remaining sessions for this student'}), 400
+
+    # Check if student already has an active session
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT COUNT(*) FROM sit_in_records WHERE id_number = ? AND logout_time IS NULL",
+        (id_number,)
+    )
+    if cursor.fetchone()[0] > 0:
+        conn.close()
+        return jsonify({'success': False, 'message': 'Student already has an active session'}), 400
+
+    try:
+        # Insert sit-in record (add date field)
+        name = f"{student['firstname']} {student['midname']} {student['lastname']}".strip()
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        today = datetime.now().strftime('%Y-%m-%d')
+        cursor.execute("""
+            INSERT INTO sit_in_records (id_number, name, purpose, lab, login_time, date)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (id_number, name, sit_purpose, laboratory, now, today))
+        # Do NOT deduct session count here!
+        conn.commit()
+        return jsonify({'success': True, 'message': 'Sit-in session started successfully'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
+    finally:
+        conn.close()

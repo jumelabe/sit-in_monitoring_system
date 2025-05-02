@@ -3,175 +3,90 @@
 {% block title %}{% endblock %}
 
 {% block content %}
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sit-in Records</title>
-    <link rel="stylesheet" href="static/styles.css">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body>
-    <div class="dashboard-container">
-        <div class="sidebar">
-            <h1 class="dashboard-title">Sit-in Records</h1>
-            <a href="{{ url_for('admin.admin_dashboard') }}" class="menu-btn">Dashboard</a>
-            <a href="{{ url_for('admin.student_list') }}" class="menu-btn">Student List</a>
-            <a href="{{ url_for('admin.current_sit_in') }}" class="menu-btn">Current Sit-in</a>
-            <a href="{{ url_for('admin.sit_in_records') }}" class="menu-btn active">Sit-in Records</a>
-            <a href="{{ url_for('admin.reports') }}" class="menu-btn">Reports</a>
-            <a href="{{ url_for('admin.feedback_reports') }}" class="menu-btn">View Feedback</a>
-            <a href="{{ url_for('admin.leaderboards') }}" class="menu-btn">Leaderboards</a>
-            <a href="{{ url_for('admin.admin_resources') }}" class="menu-btn">Resources</a>
-            <a href="{{ url_for('admin.logout') }}" class="menu-btn logout-btn">Logout</a>
-        </div>
-        
-        <div class="content">
-            <div class="container mt-4">
-                <div class="header-container">
-                    <h2>Sit-in Records</h2>
-                    <div class="search-container">
+<div class="dashboard-container">
+    <div class="sidebar">
+        <h1 class="dashboard-title">Sit-in Records</h1>
+        <a href="{{ url_for('admin.admin_dashboard') }}" class="menu-btn">Dashboard</a>
+        <a href="{{ url_for('admin.student_list') }}" class="menu-btn">Student List</a>
+        <a href="{{ url_for('admin.current_sit_in') }}" class="menu-btn">Current Sit-in</a>
+        <a href="{{ url_for('admin.sit_in_records') }}" class="menu-btn active">Sit-in Records</a>
+        <a href="{{ url_for('admin.reports') }}" class="menu-btn">Reports</a>
+        <a href="{{ url_for('admin.feedback_reports') }}" class="menu-btn">View Feedback</a>
+        <a href="{{ url_for('admin.leaderboards') }}" class="menu-btn">Leaderboards</a>
+        <a href="{{ url_for('admin.admin_resources') }}" class="menu-btn">Resources</a>
+        <a href="{{ url_for('admin.logout') }}" class="menu-btn logout-btn">Logout</a>
+    </div>
+    
+    <div class="content">
+        <div class="container mt-4">
+            <div class="table-container">
+                <div class="table-header">
+                    <h2 class="table-title">Sit-in Records</h2>
+                    <div class="table-search">
                         <input type="text" class="search-input" placeholder="Search records..." id="searchInput" onkeyup="searchTable()">
                     </div>
                 </div>
-                <div class="table-responsive">
-                    <table class="table table-striped table-hover">
-                        <thead class="table-dark">
-                            <tr>
-                                <th>ID Number</th>
-                                <th>Name</th>
-                                <th>Purpose</th>
-                                <th>Laboratory</th>
-                                <th>Login Time & Date</th>
-                                <th>Logout Time & Date</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for record in records %}
-                            <tr>
-                                <td>{{ record.id_number }}</td>
-                                <td>{{ record.name }}</td>
-                                <td>{{ record.purpose }}</td>
-                                <td>{{ record.lab }}</td>
-                                <td>{{ record.login_time }}</td>
-                                <td>{{ record.logout_time }}</td>
-                                <td>
-                                    {% if record.logout_time == 'Active' %}
-                                        <span class="badge bg-success">Active</span>
-                                    {% else %}
-                                        <span class="badge bg-secondary">Completed</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+                <table class="custom-table">
+                    <thead>
+                        <tr>
+                            <th>ID Number</th>
+                            <th>Name</th>
+                            <th>Purpose</th>
+                            <th>Laboratory</th>
+                            <th>Login Time & Date</th>
+                            <th>Logout Time & Date</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in records %}
+                        <tr>
+                            <td>{{ record.id_number }}</td>
+                            <td>{{ record.name }}</td>
+                            <td>{{ record.purpose }}</td>
+                            <td>{{ record.lab }}</td>
+                            <td>{{ record.login_time }}</td>
+                            <td>{{ record.logout_time }}</td>
+                            <td>
+                                {% if record.logout_time == 'Active' %}
+                                    <span class="badge bg-success">Active</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Completed</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
+</div>
 
-    <script>
-        function searchTable() {
-            const input = document.getElementById('searchInput');
-            const filter = input.value.toLowerCase();
-            const table = document.querySelector('.table');
-            const rows = table.getElementsByTagName('tr');
+<script>
+    function searchTable() {
+        const input = document.getElementById('searchInput');
+        const filter = input.value.toLowerCase();
+        const table = document.querySelector('.custom-table');
+        const rows = table.getElementsByTagName('tr');
 
-            for (let i = 1; i < rows.length; i++) {
-                const cells = rows[i].getElementsByTagName('td');
-                let found = false;
-                
-                for (let j = 0; j < cells.length; j++) {
-                    const cell = cells[j];
-                    if (cell) {
-                        const text = cell.textContent || cell.innerText;
-                        if (text.toLowerCase().indexOf(filter) > -1) {
-                            found = true;
-                            break;
-                        }
+        for (let i = 1; i < rows.length; i++) {
+            const cells = rows[i].getElementsByTagName('td');
+            let found = false;
+            
+            for (let j = 0; j < cells.length; j++) {
+                const cell = cells[j];
+                if (cell) {
+                    const text = cell.textContent || cell.innerText;
+                    if (text.toLowerCase().indexOf(filter) > -1) {
+                        found = true;
+                        break;
                     }
                 }
-                
-                rows[i].style.display = found ? '' : 'none';
             }
+            
+            rows[i].style.display = found ? '' : 'none';
         }
-    </script>
-    <style>
-        .table-responsive {
-            background: #fff;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(74, 53, 153, 0.07);
-        }
-        .table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
-            background: #fff;
-            border-radius: 12px;
-            overflow: hidden;
-            font-size: 15px;
-        }
-        .table thead th {
-            background-color: #4A3599;
-            color: #fff;
-            font-weight: 600;
-            padding: 16px 14px;
-            border: none;
-            text-align: center;
-            letter-spacing: 0.5px;
-        }
-        .table tbody td {
-            padding: 14px 12px;
-            border-top: 1px solid #eee;
-            font-size: 0.95rem;
-            color: #333;
-            background: #fff;
-            text-align: center;
-            vertical-align: middle;
-        }
-        .table tbody tr:hover {
-            background-color: #f6f3fd;
-            transition: background 0.2s;
-        }
-        .table-striped tbody tr:nth-of-type(odd) {
-            background-color: #f9f7fd;
-        }
-        .badge {
-            font-size: 0.95rem;
-            padding: 0.5em 1.1em;
-            border-radius: 20px;
-            font-weight: 500;
-        }
-        .header-container {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        .search-container {
-            width: 220px;
-            margin-bottom: 0;
-            display: flex;
-            gap: 10px;
-        }
-
-        .search-input {
-            width: 250px;
-            padding: 8px 15px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 0.9rem;
-            transition: all 0.3s ease;
-        }
-
-        .search-input:focus {
-            outline: none;
-            border-color: #2c3e50;
-            box-shadow: 0 0 5px rgba(44, 62, 80, 0.2);
-        }
-    </style>
-</body>
+    }
+</script>
 {% endblock %}

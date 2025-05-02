@@ -6,6 +6,12 @@ DB_NAME = 'users.db'
 def get_connection():
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
+    # Ensure sit_in_count column exists
+    try:
+        conn.execute("ALTER TABLE students ADD COLUMN sit_in_count INTEGER DEFAULT 0")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
     return conn
 
 def get_user_by_credentials(user_id, password):
@@ -589,7 +595,7 @@ def reset_all_active_sessions():
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        # Ensure reward_points and reward_redeemable columns exist
+        # Ensure reward_points, reward_redeemable, and sit_in_count columns exist
         try:
             cursor.execute("ALTER TABLE students ADD COLUMN reward_points INTEGER DEFAULT 0")
             conn.commit()
@@ -600,15 +606,19 @@ def reset_all_active_sessions():
             conn.commit()
         except sqlite3.OperationalError:
             pass
-        # Reset session count, reward_points, and reward_redeemable for all students
+        try:
+            cursor.execute("ALTER TABLE students ADD COLUMN sit_in_count INTEGER DEFAULT 0")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
+        # Reset session count, reward_points, reward_redeemable, and sit_in_count for all students
         cursor.execute("""
             UPDATE students 
             SET session_count = 30,
                 reward_points = 0,
-                reward_redeemable = 0
+                reward_redeemable = 0,
+                sit_in_count = 0
         """)
-        # Delete all sit-in records (reset sit-in count for all students)
-        cursor.execute("DELETE FROM sit_in_records")
         conn.commit()
         return True
     except Exception as e:
@@ -619,11 +629,12 @@ def reset_all_active_sessions():
         conn.close()
 
 def reset_student_session(idno):
-    """Reset session count, reward points, redeemable points, and sit-in count for a specific student."""
+    """Reset session count, reward points, redeemable points, and sit_in_count for a specific student.
+       Only reset the student's session stats, NOT their sit-in records/history."""
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        # Ensure reward_points and reward_redeemable columns exist
+        # Ensure reward_points, reward_redeemable, and sit_in_count columns exist
         try:
             cursor.execute("ALTER TABLE students ADD COLUMN reward_points INTEGER DEFAULT 0")
             conn.commit()
@@ -634,16 +645,21 @@ def reset_student_session(idno):
             conn.commit()
         except sqlite3.OperationalError:
             pass
-        # Reset session count, reward_points, and reward_redeemable for the student
+        try:
+            cursor.execute("ALTER TABLE students ADD COLUMN sit_in_count INTEGER DEFAULT 0")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
+        # Reset session count, reward_points, reward_redeemable, and sit_in_count for the student
         cursor.execute("""
             UPDATE students 
             SET session_count = 30,
                 reward_points = 0,
-                reward_redeemable = 0
+                reward_redeemable = 0,
+                sit_in_count = 0
             WHERE idno = ?
         """, (idno,))
-        # Delete sit-in records for this student (reset sit-in count for this student)
-        cursor.execute("DELETE FROM sit_in_records WHERE id_number = ?", (idno,))
+        # DO NOT delete sit-in records/history!
         conn.commit()
         return True
     except Exception as e:
@@ -688,6 +704,10 @@ def insert_sit_in_history_from_record(student_id):
                 record['date'],
                 'Completed'  # Default action value
             ))
+            # Increment sit_in_count for the student
+            cursor.execute("""
+                UPDATE students SET sit_in_count = COALESCE(sit_in_count, 0) + 1 WHERE idno = ?
+            """, (student_id,))
             conn.commit()
             print(f"Successfully inserted history record for student {student_id}")  # Debug print
             return True
@@ -708,7 +728,7 @@ def add_reward_point(student_id):
         # Begin transaction
         cursor.execute("BEGIN TRANSACTION")
         
-        # Ensure reward_points and reward_redeemable columns exist
+        # Ensure reward_points, reward_redeemable, and sit_in_count columns exist
         try:
             cursor.execute("ALTER TABLE students ADD COLUMN reward_points INTEGER DEFAULT 0")
             conn.commit()
@@ -716,6 +736,11 @@ def add_reward_point(student_id):
             pass
         try:
             cursor.execute("ALTER TABLE students ADD COLUMN reward_redeemable INTEGER DEFAULT 0")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
+        try:
+            cursor.execute("ALTER TABLE students ADD COLUMN sit_in_count INTEGER DEFAULT 0")
             conn.commit()
         except sqlite3.OperationalError:
             pass
@@ -727,7 +752,7 @@ def add_reward_point(student_id):
             WHERE id_number = ? AND logout_time IS NULL
         """, (student_id,))
 
-        # Insert into sit_in_history after session ends
+        # Insert into sit_in_history after session ends (this will increment sit_in_count)
         conn.commit()  # Commit the logout_time update before copying to history
         insert_sit_in_history_from_record(student_id)
         cursor = conn.cursor()  # Re-acquire cursor after commit
@@ -801,18 +826,17 @@ def get_most_active_students(limit=50):
     conn = get_connection()
     cursor = conn.cursor()
     try:
+        # Use sit_in_count column
         cursor.execute("""
             SELECT 
-                s.idno, 
-                s.firstname, 
-                s.lastname, 
-                s.course, 
-                s.year_level, 
-                COUNT(sir.id) as sit_in_count
-            FROM students s
-            JOIN sit_in_records sir ON s.idno = sir.id_number
-            GROUP BY s.idno
-            ORDER BY sit_in_count DESC, s.lastname ASC
+                idno, 
+                firstname, 
+                lastname, 
+                course, 
+                year_level, 
+                COALESCE(sit_in_count, 0) as sit_in_count
+            FROM students
+            ORDER BY sit_in_count DESC, lastname ASC
             LIMIT ?
         """, (limit,))
         students = cursor.fetchall()
@@ -830,19 +854,15 @@ def get_combined_leaderboard_students(limit=5):
     cursor = conn.cursor()
     students = [] # Initialize students as empty list
     try:
-        # Ensure reward_points column exists, add if not (optional, defensive coding)
+        # Ensure reward_points, reward_redeemable, and sit_in_count columns exist
         try:
             cursor.execute("SELECT reward_points FROM students LIMIT 1")
         except sqlite3.OperationalError:
-            print("Reward points column potentially missing, attempting to add...") # DEBUG
             try:
                 cursor.execute("ALTER TABLE students ADD COLUMN reward_points INTEGER DEFAULT 0")
                 conn.commit()
-                print("Added reward_points column to students table.") # DEBUG
-            except sqlite3.OperationalError as alter_err:
-                 print(f"Could not add reward_points column, might already exist: {alter_err}") # DEBUG
-                 pass
-        # Ensure reward_redeemable column exists
+            except sqlite3.OperationalError:
+                pass
         try:
             cursor.execute("SELECT reward_redeemable FROM students LIMIT 1")
         except sqlite3.OperationalError:
@@ -851,24 +871,29 @@ def get_combined_leaderboard_students(limit=5):
                 conn.commit()
             except sqlite3.OperationalError:
                 pass
+        try:
+            cursor.execute("SELECT sit_in_count FROM students LIMIT 1")
+        except sqlite3.OperationalError:
+            try:
+                cursor.execute("ALTER TABLE students ADD COLUMN sit_in_count INTEGER DEFAULT 0")
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass
 
         cursor.execute("""
             SELECT 
-                s.idno, 
-                s.firstname, 
-                s.lastname, 
-                s.course, 
-                s.year_level, 
-                COUNT(sir.id_number) as sit_in_count,
-                COALESCE(s.reward_points, 0) as reward_points
-            FROM students s
-            LEFT JOIN sit_in_records sir ON s.idno = sir.id_number
-            GROUP BY s.idno
-            ORDER BY sit_in_count DESC, reward_points DESC, s.lastname ASC
+                idno, 
+                firstname, 
+                lastname, 
+                course, 
+                year_level, 
+                COALESCE(sit_in_count, 0) as sit_in_count,
+                COALESCE(reward_points, 0) as reward_points
+            FROM students
+            ORDER BY sit_in_count DESC, reward_points DESC, lastname ASC
             LIMIT ?
         """, (limit,))
         students = cursor.fetchall()
-        print(f"Fetched {len(students)} students for leaderboard.") # DEBUG
         leaderboard = []
         for student in students:
             if hasattr(student, 'keys'):

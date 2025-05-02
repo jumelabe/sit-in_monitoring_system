@@ -1,6 +1,6 @@
 {% extends "admin/base.html" %}
 
-{% block title %}Leaderboards{% endblock %}
+{% block title %}{% endblock %}
 
 {% block content %}
 <head>
@@ -25,18 +25,12 @@
             <a href="{{ url_for('admin.logout') }}" class="menu-btn logout-btn">Logout</a>
         </div>
         <div class="content">
-            <div class="header-container">
-                <h2>Leaderboards</h2>
-                <div class="search-container">
-                    <input type="text" id="searchInput" class="search-input" placeholder="Search students...">
-                </div>
-            </div>
-
-            <!-- Combined Leaderboard Section -->
-            <div class="leaderboard-section">
-                <h3>Top 5 Most Active & Top-Performing Students</h3>
-                <div class="table-responsive">
-                    <table class="table table-hover table-striped leaderboard-table">
+            <div class="container">
+                <div class="table-container">
+                    <div class="table-header">
+                        <h2 class="table-title">Leaderboards</h2>
+                    </div>
+                    <table class="custom-table" id="leaderboardTable">
                         <thead>
                             <tr>
                                 <th>Rank</th>
@@ -82,13 +76,13 @@
     </div>
 
     <style>
-        .table-responsive {
+        .table-container {
             background: #fff;
             padding: 20px;
             border-radius: 12px;
             box-shadow: 0 2px 8px rgba(74, 53, 153, 0.07);
         }
-        .leaderboard-table {
+        .custom-table {
             width: 100%;
             border-collapse: separate;
             border-spacing: 0;
@@ -97,7 +91,7 @@
             overflow: hidden;
             font-size: 15px;
         }
-        .leaderboard-table th {
+        .custom-table th {
             background-color: #4A3599;
             color: #fff;
             font-weight: 600;
@@ -106,7 +100,7 @@
             text-align: center;
             letter-spacing: 0.5px;
         }
-        .leaderboard-table td {
+        .custom-table td {
             padding: 14px 12px;
             border-top: 1px solid #eee;
             font-size: 0.95rem;
@@ -115,22 +109,22 @@
             text-align: center;
             vertical-align: middle;
         }
-        .leaderboard-table tbody tr:hover {
+        .custom-table tbody tr:hover {
             background-color: #f6f3fd;
             transition: background 0.2s;
         }
-        .leaderboard-table tr:nth-of-type(odd) {
+        .custom-table tr:nth-of-type(odd) {
             background-color: #f9f7fd;
         }
 
-        .header-container {
+        .table-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
         }
 
-        .search-container {
+        .table-search {
             margin-bottom: 0;
             display: flex;
             gap: 10px;
@@ -151,14 +145,6 @@
             box-shadow: 0 0 5px rgba(44, 62, 80, 0.2);
         }
 
-        .leaderboard-section { /* Can remove this class if only one table */
-            margin-bottom: 40px; 
-        }
-        .leaderboard-section h3 { /* Can remove this class if only one table */
-            margin-bottom: 15px;
-            color: #34495e;
-        }
-
         .rank-1, .rank-2, .rank-3 {
             font-weight: bold;
         }
@@ -172,21 +158,5 @@
             color: #CD7F32; /* Bronze */
         }
     </style>
-
-    <script>
-        document.getElementById('searchInput').addEventListener('keyup', function() {
-            var input = this.value.toLowerCase();
-            var tableBody = document.getElementById('leaderboardTableBody');
-            var rows = tableBody.getElementsByTagName('tr');
-            for (var i = 0; i < rows.length; i++) {
-                var text = rows[i].textContent.toLowerCase();
-                if (text.includes(input)) {
-                    rows[i].style.display = '';
-                } else {
-                    rows[i].style.display = 'none';
-                }
-            }
-        });
-    </script>
 </body>
 {% endblock %}

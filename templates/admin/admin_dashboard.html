@@ -29,57 +29,82 @@
         </div>
         <div class="content">
             <div class="container">
-                <!-- Statistics Section -->
-                <div class="statistics">
-                    <div class="stat-item">
-                        <h3>Student Registered</h3>
-                        <p>{{ student_registered }}</p>
-                    </div>
-                    <div class="stat-item">
-                        <h3>Current Sit-In</h3>
-                        <p>{{ current_sit_in }}</p>
-                    </div>
-                    <div class="stat-item">
-                        <h3>Total Sit-In</h3>
-                        <p>{{ total_sit_in }}</p>
+                <div class="dashboard-stats">
+                    <div class="statistics">
+                        <div class="stat-item">
+                            <h3>Student Registered</h3>
+                            <p>{{ student_registered }}</p>
+                        </div>
+                        <div class="stat-item">
+                            <h3>Current Sit-In</h3>
+                            <p>{{ current_sit_in }}</p>
+                        </div>
+                        <div class="stat-item">
+                            <h3>Total Sit-In</h3>
+                            <p>{{ total_sit_in }}</p>
+                        </div>
                     </div>
                 </div>
                 <div class="chart-announcement-container">
-                    <!-- Chart Section -->
-                    <div class="chart-container">
-                        <h3>Sit-In Purposes</h3>
-                        <canvas id="purposeChart"></canvas>
+                    <div class="chart-section">
+                        <div class="table-container h-100">
+                            <div class="table-header">
+                                <h2 class="table-title">Sit-In Analytics</h2>
+                            </div>
+                            <div class="chart-content">
+                                <canvas id="purposeChart"></canvas>
+                            </div>
+                        </div>
                     </div>
-                    <!-- Announcements Section -->
-                    <div class="announcement-container">
-                        <h3>Announcements</h3>
-                        <ul class="announcement-list">
-                            {% for announcement in announcements %}
-                                <li class="announcement-item">
-                                    <div class="announcement-header">
-                                        <h4>{{ announcement.title }}</h4>
-                                        <small>{{ announcement.created_at }}</small>
-                                    </div>
-                                    <p>{{ announcement.content }}</p>
-                                    <div class="announcement-actions">
-                                        <button class="action-btn edit-action" onclick="openEditModal('{{ announcement.id }}', '{{ announcement.title | escape }}', '{{ announcement.content | escape }}')">
-                                            <i class="fas fa-edit"></i> Edit
+                    
+                    <div class="announcement-section">
+                        <div class="table-container h-100">
+                            <div class="table-header">
+                                <h2 class="table-title">Announcements</h2>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="announcement-list-container">
+                                    <ul class="announcement-list">
+                                        {% for announcement in announcements %}
+                                        <li class="announcement-item">
+                                            <div class="announcement-header">
+                                                <h4>{{ announcement.title }}</h4>
+                                                <small>{{ announcement.created_at }}</small>
+                                            </div>
+                                            <p>{{ announcement.content }}</p>
+                                            <div class="announcement-actions">
+                                                <button class="btn btn-sm btn-outline-primary" onclick="openEditModal('{{ announcement.id }}', '{{ announcement.title | escape }}', '{{ announcement.content | escape }}')">
+                                                    <i class="fas fa-edit"></i> Edit
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-danger" onclick="openDeleteModal('{{ announcement.id }}')">
+                                                    <i class="fas fa-trash"></i> Delete
+                                                </button>
+                                            </div>
+                                        </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                                <div class="announcement-form-container mt-3">
+                                    <form action="{{ url_for('admin.admin_dashboard') }}" method="post" class="add-announcement-form">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <div class="form-group mb-3">
+                                            <input type="text" name="title" placeholder="Announcement Title" required class="form-control">
+                                        </div>
+                                        <div class="form-group mb-3">
+                                            <textarea name="content" placeholder="Announcement Content" required class="form-control" rows="3"></textarea>
+                                        </div>
+                                        <button type="submit" class="btn btn-primary w-100">
+                                            <i class="fas fa-plus"></i> Add Announcement
                                         </button>
-                                        <button class="action-btn delete-action" onclick="openDeleteModal('{{ announcement.id }}')">
-                                            <i class="fas fa-trash"></i> Delete
-                                        </button>
-                                    </div>
-                                </li>
-                            {% endfor %}
-                        </ul>
-                        <form action="{{ url_for('admin.admin_dashboard') }}" method="post" class="add-announcement-form">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="text" name="title" placeholder="Title" required>
-                            <textarea name="content" placeholder="Content" required></textarea>
-                            <button type="submit" class="add-btn">Add Announcement</button>
-                        </form>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
     <script>
         // Fetch data for the chart
         fetch('/admin/sit_in_purposes')
@@ -489,7 +514,11 @@
         }
         
         .chart-announcement-container {
-            flex-direction: column;
+            grid-template-columns: 1fr; /* Stack on smaller screens */
+        }
+        
+        .chart-section, .announcement-section {
+            min-height: 400px;
         }
     }
 
@@ -544,8 +573,52 @@
     }
 
     .chart-announcement-container {
-        display: flex;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
         gap: 20px;
+        margin-top: 20px;
+        min-height: 600px;
+    }
+
+    .chart-section, .announcement-section {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .table-container.h-100 {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .chart-content {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        min-height: 400px;
+    }
+
+    .announcement-list-container {
+        flex: 1;
+        overflow-y: auto;
+        max-height: 400px;
+        padding: 0 20px;
+    }
+
+    .announcement-form-container {
+        padding: 20px;
+        border-top: 1px solid #eee;
+        background: #f8f9fa;
+        border-bottom-left-radius: 15px;
+        border-bottom-right-radius: 15px;
+    }
+
+    @media (max-width: 1200px) {
+        .chart-announcement-container {
+            grid-template-columns: 1fr;
+        }
     }
 
     .announcement-container {
@@ -590,23 +663,16 @@
         list-style: none;
         padding: 0;
         margin: 0;
-        overflow-y: auto;
         max-height: 300px;
-        flex-grow: 1;
+        overflow-y: auto;
     }
 
     .announcement-item {
-        margin-bottom: 20px;
-        background: #f8f9fa;
-        border-radius: 10px;
         padding: 15px;
-        border-left: 4px solid #4a3599;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-    
-    .announcement-item:hover {
-        transform: translateX(3px);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
+        background: #f8f9fa;
+        margin-bottom: 15px;
+        border-left: 4px solid #4A3599;
     }
 
     .announcement-header {
@@ -617,45 +683,34 @@
     }
 
     .announcement-header h4 {
-        font-size: 18px;
-        font-weight: 600;
         margin: 0;
+        font-size: 16px;
+        font-weight: 600;
         color: #2c3e50;
     }
 
     .announcement-header small {
-        font-size: 13px;
         color: #6c757d;
-        font-style: italic;
+        font-size: 12px;
     }
 
     .announcement-item p {
-        font-size: 15px;
-        margin-bottom: 12px;
-        color: #495057;
-        line-height: 1.5;
+        margin: 0 0 10px;
+        color: #4a5568;
+        font-size: 14px;
     }
 
     .announcement-actions {
         display: flex;
+        gap: 8px;
         justify-content: flex-end;
-        gap: 10px;
-        margin-top: 8px;
     }
-    
-    .announcement-actions form {
-        display: none;
-        margin-top: 10px;
-        background: #fff;
-        padding: 15px;
-        border-radius: 8px;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+
+    .add-announcement-form {
+        border-top: 1px solid #eee;
+        padding-top: 20px;
     }
-    
-    .announcement-item.editing .announcement-actions form {
-        display: block;
-    }
-    
+
     .announcement-actions form input,
     .announcement-actions form textarea,
     .add-announcement-form input,

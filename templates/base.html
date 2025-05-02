@@ -25,6 +25,74 @@
     {% endwith %}
   </div>
   {% block content %}{% endblock %}
+
+  <style>
+    /* Responsive styles for admin pages */
+    @media (max-width: 767px) {
+        .dashboard-container {
+            flex-direction: column;
+        }
+        
+        .main-content {
+            width: 100%;
+            padding: 16px;
+        }
+        
+        .upload-inputs {
+            flex-direction: column;
+        }
+        
+        .upload-inputs span {
+            margin: 8px 0;
+        }
+        
+        .card {
+            padding: 16px;
+        }
+        
+        .action-btn-group {
+            flex-direction: column;
+            width: 100%;
+        }
+        
+        .action-btn-group form {
+            width: 100%;
+            margin-bottom: 5px;
+        }
+        
+        .btn-sm {
+            width: 100%;
+            text-align: center;
+        }
+    }
+
+    /* Consistent section title styling for all pages */
+    .section-title {
+        font-size: 1.5rem;
+        margin: 0 0 12px 0;
+        font-weight: 700;
+        color: #1a237e;
+        text-align: left;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .section-title i {
+        color: #1976d2;
+    }
+
+    @media screen and (max-width: 1024px) {
+        .section-title {
+            font-size: 1.3rem;
+        }
+    }
+    @media screen and (max-width: 480px) {
+        .section-title {
+            font-size: 1.1rem;
+        }
+    }
+  </style>
+  
   <script>
     // Automatically hide flash messages after 3 seconds
     setTimeout(function() {

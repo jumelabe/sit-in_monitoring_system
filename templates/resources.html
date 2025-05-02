@@ -2,7 +2,6 @@
 {% block title %}Lab Resources{% endblock %}
 
 {% block content %}
-<body>
 <div class="dashboard-container">
     <div class="sidebar">
         <h1 class="dashboard-title">Resources</h1>
@@ -14,7 +13,7 @@
         <a href="{{ url_for('auth.logout') }}" class="menu-btn logout-btn">Logout</a>
     </div>
     <div class="container" style="max-width: 1200px; margin: 40px auto;">
-        <h1 style="font-weight: 700; color: #222; text-align: left; margin-left: 8px; margin-bottom: 12px;">RESOURCES</h1>
+        <h1 class="section-title"><i class="fas fa-book"></i> RESOURCES</h1>
         <div class="row" style="display: flex; flex-wrap: wrap; gap: 24px;">
             {% for res in resources %}
                 <div class="resource-card improved-resource-card">
@@ -133,6 +132,6 @@
         min-width: 0 !important;
     }
 }
+/* Removed redundant .section-title styles, now inherited from base.html */
 </style>
-</body>
 {% endblock %}

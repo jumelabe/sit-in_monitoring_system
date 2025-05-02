@@ -9,113 +9,110 @@
 {% endblock %}
 
 {% block content %}
-<button class="mobile-nav-toggle" onclick="toggleSidebar()">
-    <i class="fas fa-bars"></i>
-</button>
-<!-- Sidebar -->
-<div class="sidebar">
-    <h1 class="dashboard-title">Reports</h1>
-    <a href="{{ url_for('admin.admin_dashboard') }}" class="menu-btn">Dashboard</a>
-    <a href="{{ url_for('admin.student_list') }}" class="menu-btn">Student List</a>
-    <a href="{{ url_for('admin.current_sit_in') }}" class="menu-btn">Current Sit-in</a>
-    <a href="{{ url_for('admin.sit_in_records') }}" class="menu-btn">Sit-in Records</a>
-    <a href="{{ url_for('admin.reports') }}" class="menu-btn active">Reports</a>
-    <a href="{{ url_for('admin.feedback_reports') }}" class="menu-btn">View Feedback</a>
-    <a href="{{ url_for('admin.leaderboards') }}" class="menu-btn">Leaderboards</a>
-    <a href="{{ url_for('admin.admin_resources') }}" class="menu-btn">Resources</a>
-    <a href="{{ url_for('admin.logout') }}" class="menu-btn logout-btn">Logout</a>
-</div>
+<div class="dashboard-container">
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <h1 class="dashboard-title">Reports</h1>
+        <a href="{{ url_for('admin.admin_dashboard') }}" class="menu-btn">Dashboard</a>
+        <a href="{{ url_for('admin.student_list') }}" class="menu-btn">Student List</a>
+        <a href="{{ url_for('admin.current_sit_in') }}" class="menu-btn">Current Sit-in</a>
+        <a href="{{ url_for('admin.sit_in_records') }}" class="menu-btn">Sit-in Records</a>
+        <a href="{{ url_for('admin.reports') }}" class="menu-btn active">Reports</a>
+        <a href="{{ url_for('admin.feedback_reports') }}" class="menu-btn">View Feedback</a>
+        <a href="{{ url_for('admin.leaderboards') }}" class="menu-btn">Leaderboards</a>
+        <a href="{{ url_for('admin.admin_resources') }}" class="menu-btn">Resources</a>
+        <a href="{{ url_for('admin.logout') }}" class="menu-btn logout-btn">Logout</a>
+    </div>
 
-<!-- Main Content -->
-<div class="container-fluid px-4">
-    <h1 class="mt-4">Generate Reports</h1>
+    <div class="content">
+        <div class="container">
+            <div class="table-container">
+                <div class="table-header">
+                    <h2 class="table-title">Generate Reports</h2>
+                </div>
+                
+                <!-- Filter Form -->
+                <div class="filter-section mb-4">
+                    <form id="filterForm">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <div class="form-group">
+                                    <label for="labFilter" class="form-label">Laboratory:</label>
+                                    <select name="lab" class="form-select w-100" id="labFilter">
+                                        <option value="" {% if not selected_lab %}selected{% endif %}>All</option>
+                                        {% for lab in labs %}
+                                        <option value="{{ lab }}" {% if selected_lab == lab %}selected{% endif %}>{{ lab }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="form-group">
+                                    <label for="purposeFilter" class="form-label">Purpose:</label>
+                                    <select name="purpose" class="form-select w-100" id="purposeFilter" style="border:2px solid #4A3599; border-radius:12px; font-size:1.1rem; font-weight:400; color:#222;">
+                                        <option value="" {% if not selected_purpose %}selected{% endif %}>All</option>
+                                        {% for purpose in purposes %}
+                                        <option value="{{ purpose }}" {% if selected_purpose == purpose %}selected{% endif %}>{{ purpose }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-12 mt-3">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-filter"></i> Apply Filters
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
 
-    <div class="card mb-4">
-        <div class="card-header">
-            <i class="fas fa-filter me-1"></i>
-            Filter Reports
-        </div>
-        <div class="card-body">
-            <!-- Updated Filter Form -->
-            <form class="mb-4" id="filterForm">
-                <div class="row">
-                    <div class="col-md-3">
-                        <div class="form-group">
-                            <label>Laboratory:</label>
-                            <select name="lab" class="form-control" id="labFilter">
-                                <option value="">All Labs</option>
-                                {% for lab in labs %}
-                                <option value="{{ lab }}" {% if selected_lab == lab %}selected{% endif %}>{{ lab }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="form-group">
-                            <label>Purpose:</label>
-                            <select name="purpose" class="form-control" id="purposeFilter">
-                                <option value="">All Purposes</option>
-                                {% for purpose in purposes %}
-                                <option value="{{ purpose }}" {% if selected_purpose == purpose %}selected{% endif %}>{{ purpose }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                    </div>
-                    <div class="col-md-12 mt-3">
-                        <button type="submit" class="btn btn-primary" style="background-color: #4A3599; border: none;">Apply Filters</button>
+                <!-- Export Section -->
+                <div class="export-section mb-4">
+                    <h6 class="mb-3">Export Options</h6>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-success" onclick="exportData('csv')">
+                            <i class="fas fa-file-csv"></i> Export CSV
+                        </button>
+                        <button type="button" class="btn btn-success" onclick="exportData('excel')">
+                            <i class="fas fa-file-excel"></i> Export Excel
+                        </button>
+                        <button type="button" class="btn btn-success" onclick="exportData('pdf')">
+                            <i class="fas fa-file-pdf"></i> Export PDF
+                        </button>
                     </div>
                 </div>
-            </form>
 
-            <!-- Export Section -->
-            <div class="export-section">
-                <h6 class="mb-3">Export Options</h6>
-                <div class="d-flex flex-wrap">
-                    <button type="button" class="btn btn-success btn-export" onclick="exportData('csv')">
-                        <i class="fas fa-file-csv me-1"></i>
-                        <span class="button-text">Export CSV</span>
-                    </button>
-                    <button type="button" class="btn btn-success btn-export" onclick="exportData('excel')">
-                        <i class="fas fa-file-excel me-1"></i>
-                        <span class="button-text">Export Excel</span>
-                    </button>
-                    <button type="button" class="btn btn-success btn-export" onclick="exportData('pdf')">
-                        <i class="fas fa-file-pdf me-1"></i>
-                        <span class="button-text">Export PDF</span>
-                    </button>
+                <!-- Reports Table -->
+                <div class="table-responsive">
+                    <table id="reportsTable" class="custom-table">
+                        <thead>
+                            <tr>
+                                <th>ID Number</th>
+                                <th>Name</th>
+                                <th>Purpose</th>
+                                <th>Laboratory</th>
+                                <th>Login Time</th>
+                                <th>Logout Time</th>
+                                <th>Duration</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for report in reports %}
+                            <tr>
+                                <td>{{ report.id_number }}</td>
+                                <td>{{ report.name }}</td>
+                                <td>{{ report.purpose }}</td>
+                                <td>{{ report.lab }}</td>
+                                <td>{{ report.login_time }}</td>
+                                <td>{{ report.logout_time }}</td>
+                                <td>{{ report.duration }}</td>
+                                <td>{{ report.date }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
-            </div>
-
-            <!-- Enhanced Reports Table -->
-            <div class="table-responsive">
-                <table id="reportsTable" class="table table-bordered table-striped">
-                    <thead>
-                        <tr>
-                            <th>ID Number</th>
-                            <th>Name</th>
-                            <th>Purpose</th>
-                            <th>Laboratory</th>
-                            <th>Login Time</th>
-                            <th>Logout Time</th>
-                            <th>Duration</th>
-                            <th>Date</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for report in reports %}
-                        <tr>
-                            <td>{{ report.id_number }}</td>
-                            <td>{{ report.name }}</td>
-                            <td>{{ report.purpose }}</td>
-                            <td>{{ report.lab }}</td>
-                            <td>{{ report.login_time }}</td>
-                            <td>{{ report.logout_time }}</td>
-                            <td>{{ report.duration }}</td>
-                            <td>{{ report.date }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
             </div>
         </div>
     </div>
@@ -126,16 +123,12 @@
         <span class="visually-hidden">Loading...</span>
     </div>
 </div>
+
 {% endblock %}
 
 {% block extra_js %}
-<!-- Load jQuery first -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-
-<!-- Then load Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-
-<!-- Then load DataTables and its extensions -->
 <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.2.2/js/dataTables.buttons.min.js"></script>
@@ -144,17 +137,12 @@
 <script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.print.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.colVis.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.2.9/js/dataTables.responsive.min.js"></script>
-
-<!-- Load other required libraries -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
 
-<!-- Move your custom script to the end -->
 <script>
-// Wrap everything in document.ready to ensure jQuery is loaded
 $(document).ready(function() {
-    // Initialize DataTable
     const table = $('#reportsTable').DataTable({
         responsive: true,
         order: [[7, 'desc']],
@@ -183,17 +171,14 @@ $(document).ready(function() {
         autoWidth: false
     });
 
-    // Handle form submission
     $('#filterForm').on('submit', function(e) {
         e.preventDefault();
         const loadingOverlay = $('.loading-overlay');
         loadingOverlay.css('display', 'flex');
 
-        // Get form data
         const formData = new FormData(this);
         const searchParams = new URLSearchParams(formData);
 
-        // Update URL with filter parameters
         const url = new URL(window.location.href);
         for (const [key, value] of formData.entries()) {
             if (value) {
@@ -203,7 +188,6 @@ $(document).ready(function() {
             }
         }
 
-        // Fetch filtered data
         fetch(url, {
             headers: {
                 'X-Requested-With': 'XMLHttpRequest'
@@ -211,13 +195,10 @@ $(document).ready(function() {
         })
         .then(response => response.json())
         .then(data => {
-            // Clear and reload table
             table.clear();
             if (data.reports) {
                 table.rows.add(data.reports).draw();
             }
-            
-            // Update URL without reloading page
             window.history.pushState({}, '', url);
         })
         .catch(error => {
@@ -229,26 +210,22 @@ $(document).ready(function() {
         });
     });
 
-    // Reset button handling
     $('button[type="reset"]').on('click', function() {
         setTimeout(() => {
             $('#filterForm').submit();
         }, 0);
     });
 
-    // Handle window resize
     $(window).resize(function() {
         if ($(window).width() > 991) {
             $('.sidebar').show();
         }
     });
 
-    // Adjust table columns on window resize
     $(window).on('resize', function() {
         table.columns.adjust().responsive.recalc();
     });
 
-    // Initial column adjustment
     table.columns.adjust().responsive.recalc();
 });
 
@@ -256,7 +233,6 @@ function toggleSidebar() {
     $('.sidebar').toggleClass('active');
 }
 
-// Close sidebar when clicking outside on mobile
 $(document).on('click', function(e) {
     if ($(window.innerWidth <= 991)) {
         if (!$(e.target).closest('.sidebar').length && !$(e.target).closest('.mobile-nav-toggle').length) {
@@ -265,7 +241,6 @@ $(document).on('click', function(e) {
     }
 });
 
-// Initialize tooltips after document is ready
 $(document).ready(function() {
     $('.btn-export').tooltip({
         title: 'Click to export data',
@@ -275,14 +250,11 @@ $(document).ready(function() {
 });
 
 function exportData(format) {
-    // Show loading overlay
     $('.loading-overlay').css('display', 'flex');
     
-    // Get current filter values
     const lab = $('#labFilter').val() || '';
     const purpose = $('#purposeFilter').val() || '';
     
-    // Create the export URL
     const url = new URL(`${window.location.origin}/admin/export-reports/${format}`);
     url.searchParams.append('lab', lab);
     url.searchParams.append('purpose', purpose);
@@ -324,195 +296,69 @@ function exportData(format) {
     });
 }
 </script>
+
 <style>
-    /* Remove duplicate CSS rules and keep only the most recent/relevant ones */
-    .btn-export { margin-right: 10px; }
-    .export-section {
-        background: #f8f9fa;
-        padding: 15px;
-        border-radius: 5px;
-        margin-bottom: 20px;
+.export-section {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+}
+
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.8);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+.form-group {
+    width: 100%;
+}
+.form-select, .form-control {
+    width: 100%;
+    min-width: 120px;
+    max-width: 100%;
+    font-size: 1rem;
+    padding: 10px 14px;
+    box-sizing: border-box;
+    border: 2px solid #4A3599;
+    border-radius: 12px;
+    background: #fff;
+    color: #222;
+    font-weight: 400;
+    transition: border-color 0.2s;
+}
+.form-select:focus, .form-control:focus {
+    border-color: #37277a;
+    box-shadow: 0 0 0 2px rgba(74, 53, 153, 0.08);
+}
+.form-label {
+    font-weight: 500;
+    margin-bottom: 6px;
+    display: block;
+}
+@media (max-width: 576px) {
+    .form-group {
+        margin-bottom: 12px;
     }
-    .filter-section {
-        background: #ffffff;
-        padding: 20px;
-        border-radius: 5px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        margin-bottom: 20px;
+    .form-select, .form-control {
+        font-size: 0.98rem;
+        padding: 8px 10px;
     }
-    .container-fluid {
-        margin-left: 250px;
-        width: calc(100% - 250px);
-        padding: 20px 30px;
-        height: 100vh;
-        overflow-y: auto;
-    }
-    .sidebar {
-        position: fixed;
-        top: 0;
-        left: 0;
-        height: 100vh;
-        width: 250px;
-        overflow-y: auto;
-        z-index: 1000;
-    }
-    body {
-        overflow: hidden;
-        height: 100vh;
-    }
-    .card {
-        margin-bottom: 20px;
-    }
-    .table-responsive {
-        overflow-x: auto;
-        max-height: calc(100vh - 400px);
-        background: #fff;
-        border-radius: 12px;
-        box-shadow: 0 2px 8px rgba(74, 53, 153, 0.07);
-        padding: 0;
-    }
-    #reportsTable {
+}
+
+@media (max-width: 576px) {
+    .btn-export {
         width: 100%;
-        border-collapse: separate;
-        border-spacing: 0;
-        background: #fff;
-        border-radius: 12px;
-        overflow: hidden;
-        font-size: 15px;
+        margin: 5px 0;
     }
-    #reportsTable th {
-        background: #4A3599;
-        color: #fff;
-        font-weight: 600;
-        border: none;
-        padding: 16px 14px;
-        text-align: center;
-        letter-spacing: 0.5px;
-    }
-    #reportsTable td {
-        background: #fff;
-        color: #333;
-        border-top: 1px solid #eee;
-        padding: 14px 12px;
-        text-align: center;
-        vertical-align: middle;
-    }
-    #reportsTable tbody tr:hover {
-        background: #f6f3fd;
-        transition: background 0.2s;
-    }
-    .stats-card {
-        background: white;
-        padding: 15px;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        margin-bottom: 15px;
-        min-height: 130px;
-        height: auto;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-    }
-    .stats-number {
-        font-size: 22px;
-        font-weight: bold;
-        color: #0d6efd;
-        margin: 8px 0;
-        line-height: 1;
-    }
-    .loading-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(255, 255, 255, 0.8);
-        display: none;
-        justify-content: center;
-        align-items: center;
-        z-index: 9999;
-    }
-
-    /* Adjust the scrollbar appearance */
-    ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-    }
-
-    ::-webkit-scrollbar-track {
-        background: #f1f1f1;
-    }
-
-    ::-webkit-scrollbar-thumb {
-        background: #888;
-        border-radius: 4px;
-    }
-
-    ::-webkit-scrollbar-thumb:hover {
-        background: #555;
-    }
-
-    /* Mobile responsiveness */
-    @media (max-width: 991px) {
-        .container-fluid {
-            margin-left: 0;
-            width: 100%;
-            padding: 15px;
-            padding-top: 60px;
-        }
-
-        .mobile-nav-toggle {
-            display: block;
-            position: fixed;
-            top: 15px;
-            left: 15px;
-            z-index: 1000;
-        }
-
-        .sidebar {
-            display: none;
-        }
-
-        .sidebar.active {
-            display: block;
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 100vh;
-            z-index: 999;
-            width: 250px;
-        }
-    }
-
-    @media (max-width: 576px) {
-        .btn-export {
-            width: 100%;
-            margin: 5px 0;
-        }
-    }
-
-    /* Add PDF-specific table styling */
-    .pdf-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin: 15px 0;
-    }
-    
-    .pdf-table th {
-        background-color: #4A3599;
-        color: white;
-        font-weight: bold;
-        padding: 10px;
-        border: 1px solid #ddd;
-    }
-    
-    .pdf-table td {
-        padding: 8px;
-        border: 1px solid #ddd;
-    }
-    
-    .pdf-table tr:nth-child(even) {
-        background-color: #f9f9f9;
-    }
+}
 </style>
 {% endblock %}

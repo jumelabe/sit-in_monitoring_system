@@ -6,11 +6,413 @@
   <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='images/css.png') }}">
   <title>{% block title %}{% endblock %}Admin - CCS Sit-In Management System</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
   {% block head %}{% endblock %}
   {% block extra_css %}{% endblock %}
+  <style>
+    /* Responsive styles for admin pages */
+    @media (max-width: 767px) {
+        .dashboard-container {
+            flex-direction: column;
+        }
+        
+        .main-content {
+            width: 100%;
+            padding: 16px;
+        }
+        
+        .upload-inputs {
+            flex-direction: column;
+        }
+        
+        .upload-inputs span {
+            margin: 8px 0;
+        }
+        
+        .card {
+            padding: 16px;
+        }
+        
+        .action-btn-group {
+            flex-direction: column;
+            width: 100%;
+        }
+        
+        .action-btn-group form {
+            width: 100%;
+            margin-bottom: 5px;
+        }
+        
+        .btn-sm {
+            width: 100%;
+            text-align: center;
+        }
+    }
+
+    /* Common Table Styles */
+    .table-container {
+        background: #fff;
+        padding: 24px;
+        border-radius: 15px;
+        box-shadow: 0 2px 12px rgba(74, 53, 153, 0.08);
+        margin: 20px 0;
+    }
+
+    .table-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .table-title {
+        font-size: 1.75rem;
+        color: #2c3e50;
+        font-weight: 600;
+        margin: 0;
+    }
+
+    .table-search {
+        width: 280px;
+        position: relative;
+    }
+
+    .search-input {
+        width: 100%;
+        padding: 10px 16px;
+        border: 1.5px solid #ddd4fc;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
+        background: #fff;
+    }
+
+    .search-input:focus {
+        outline: none;
+        border-color: #4A3599;
+        box-shadow: 0 0 0 3px rgba(74, 53, 153, 0.1);
+    }
+
+    .custom-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        margin-bottom: 0;
+    }
+
+    .custom-table thead th {
+        background: #4A3599;
+        color: #fff;
+        font-weight: 600;
+        padding: 16px;
+        font-size: 0.95rem;
+        border: none;
+        text-align: left;
+        letter-spacing: 0.3px;
+    }
+
+    .custom-table th:first-child {
+        border-top-left-radius: 10px;
+    }
+
+    .custom-table th:last-child {
+        border-top-right-radius: 10px;
+    }
+
+    .custom-table tbody td {
+        padding: 14px 16px;
+        font-size: 0.95rem;
+        color: #2c3e50;
+        border-top: 1px solid #eef2f7;
+        vertical-align: middle;
+    }
+
+    .custom-table tbody tr:hover {
+        background-color: #f8f9ff;
+        transition: background-color 0.2s ease;
+    }
+
+    .custom-table tbody tr:last-child td:first-child {
+        border-bottom-left-radius: 10px;
+    }
+
+    .custom-table tbody tr:last-child td:last-child {
+        border-bottom-right-radius: 10px;
+    }
+
+    .badge {
+        padding: 6px 12px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        border-radius: 20px;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .table-container {
+            padding: 16px;
+        }
+
+        .table-header {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .table-search {
+            width: 100%;
+        }
+
+        .table-title {
+            font-size: 1.5rem;
+        }
+
+        .custom-table {
+            font-size: 0.9rem;
+        }
+
+        .custom-table thead th {
+            padding: 12px;
+        }
+
+        .custom-table tbody td {
+            padding: 12px;
+        }
+    }
+
+    /* Additional common styles */
+    .btn-success {
+        background: #4A3599 !important;
+        color: #fff !important;
+    }
+    
+    .btn-success:hover {
+        background: #37277a !important;
+    }
+
+    .btn-danger {
+        background: #dc3545 !important;
+        color: #fff !important;
+    }
+
+    .btn-danger:hover {
+        background: #b52a37 !important;
+    }
+
+    .card {
+        border: none;
+        border-radius: 15px;
+        box-shadow: 0 0 20px rgba(74,53,153,0.08);
+    }
+
+    /* Common rank badges */
+    .rank-1 { color: #FFD700; font-weight: bold; }
+    .rank-2 { color: #C0C0C0; font-weight: bold; }
+    .rank-3 { color: #CD7F32; font-weight: bold; }
+
+    /* Common button groups */
+    .btn-group .btn {
+        padding: 0.4rem 0.9rem;
+        border-radius: 6px;
+        font-size: 1rem;
+        border: none;
+        margin: 0 2px;
+        transition: background 0.2s;
+    }
+
+    /* Common modal styles */
+    .modal-header {
+        background: #ddd4fc;
+        padding: 20px 30px;
+        border-bottom: 1px solid #eee;
+    }
+
+    .modal-content {
+        border: none;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        background: #fff;
+    }
+
+    .modal-body {
+        padding: 30px;
+        background: #fff;
+    }
+
+    .modal-footer {
+        background: #fff;
+        border-top: 1px solid #eee;
+        padding: 20px 30px;
+        gap: 10px;
+    }
+
+    /* Common search bar */
+    .search-bar-group {
+        width: 100%;
+        border-radius: 8px;
+        border: 1.5px solid #ddd4fc;
+        background: #fff;
+        box-shadow: none;
+        overflow: hidden;
+        height: 34px;
+    }
+
+    /* Common table text alignment */
+    .text-center { text-align: center !important; }
+    .text-left { text-align: left !important; }
+    .text-right { text-align: right !important; }
+
+    /* Common form controls */
+    .form-control, .form-select {
+        padding: 12px 15px;
+        border-radius: 8px;
+        border: 2px solid #e0e0e0;
+        font-size: 15px;
+        transition: all 0.3s ease;
+    }
+
+    .form-control:focus, .form-select:focus {
+        border-color: #4A3599;
+        box-shadow: 0 0 0 3px rgba(74, 53, 153, 0.1);
+    }
+
+    /* Icon styles */
+    .fas, .far, .fab, .fa {
+      display: inline-block;
+      line-height: 1;
+      vertical-align: middle;
+      margin-right: 0.25rem;
+    }
+
+    /* Button icon spacing */
+    .btn i {
+      margin-right: 0.25rem;
+      font-size: 1rem;
+      position: relative;
+      top: -1px;
+    }
+
+    .btn-group-sm .btn i {
+      font-size: 0.875rem;
+    }
+
+    /* Search icon in input group */
+    .input-group-text i {
+      color: #4A3599;
+      font-size: 0.9rem;
+    }
+
+    /* Action button icons */
+    .action-btn i {
+      margin: 0;
+      font-size: 0.9rem;
+    }
+
+    /* Modal icons */
+    .modal-body i.fa-exclamation-triangle {
+      color: #ffc107;
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+
+    /* Table icons */
+    .custom-table i {
+      font-size: 1rem;
+      vertical-align: middle;
+    }
+
+    /* Status icons */
+    .badge i {
+      margin-right: 0.25rem;
+    }
+
+    /* Additional global styles */
+    .dashboard-container {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    .content {
+      flex: 1;
+      padding: 20px;
+      background: #f8f9fa;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* Card styles */
+    .card {
+      background: #fff;
+      border-radius: 15px;
+      box-shadow: 0 2px 12px rgba(74, 53, 153, 0.08);
+      margin-bottom: 24px;
+    }
+
+    .card-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid #eef2f7;
+    }
+
+    .card-body {
+      padding: 24px;
+    }
+
+    /* Button styles */
+    .btn-primary {
+      background: #4A3599;
+      border-color: #4A3599;
+    }
+
+    .btn-primary:hover {
+      background: #37277a;
+      border-color: #37277a;
+    }
+
+    /* Status badges */
+    .badge.bg-success { background-color: #28a745 !important; }
+    .badge.bg-warning { background-color: #ffc107 !important; }
+    .badge.bg-danger { background-color: #dc3545 !important; }
+    .badge.bg-secondary { background-color: #6c757d !important; }
+
+    /* Action buttons */
+    .action-buttons {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+    }
+
+    .action-btn {
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    /* Profile image */
+    .profile-pic {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    /* Global text styles */
+    .text-muted {
+      color: #6c757d !important;
+    }
+
+    .small {
+      font-size: 0.875rem;
+    }
+  </style>
 </head>
 <body>
   <div class="flash-messages">
@@ -26,6 +428,12 @@
     {% endwith %}
   </div>
   {% block content %}{% endblock %}
+  
+  <!-- Add Bootstrap JS and its dependencies -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js"></script>
+
   <script>
     // Automatically hide flash messages after 3 seconds
     setTimeout(function() {

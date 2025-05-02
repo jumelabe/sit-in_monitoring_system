@@ -15,7 +15,7 @@
     <div class="content">
         <div class="container">
             <div class="sit-in-list">
-                <h2>My Sit-In History</h2>
+                <h2 class="section-title"><i class="fas fa-history"></i> My Sit-In History</h2>
                 <input type="text" id="searchInput" onkeyup="searchHistory()" placeholder="Search history..." class="form-control mb-3">
                 <table class="table table-bordered table-hover" id="historyTable">
                     <thead class="thead-dark">
@@ -141,14 +141,6 @@
         flex: 1;
         width: 100%;
         overflow-x: auto;
-    }
-
-    .sit-in-list h2 {
-        font-size: 28px;
-        font-weight: bold;
-        margin-bottom: 25px;
-        text-align: center;
-        color: #333;
     }
 
     #historyTable {

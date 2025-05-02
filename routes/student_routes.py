@@ -116,7 +116,7 @@ def reserve():
         reservation_data = {
             'id_number': request.form.get('id_number'),
             'purpose': request.form.get('purpose'),
-            'lab': request.form.get('lab'),
+            'lab': request.form.get('laboratory'),  # changed from 'lab' to 'laboratory'
             'time_in': request.form.get('time_in'),
             'date': request.form.get('date')
         }

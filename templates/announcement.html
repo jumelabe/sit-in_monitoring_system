@@ -24,7 +24,7 @@
             {% for announcement in announcements %}
             <div class="announcement-card">
                 <div class="announcement-header">
-                    <h3 class="announcement-title">{{ announcement['title'] }}</h3>
+                    <h3 class="section-title">{{ announcement['title'] }}</h3>
                     <span class="announcement-date">
                         <i class="far fa-clock"></i>
                         {{ announcement['created_at'][:10] }}
@@ -43,9 +43,9 @@
 .announcement-container {
     flex: 1;
     padding: 15px;
-    margin-left: 100px; /* Further reduced margin */
+    margin-left: 100px;
     margin-right: 100px;
-    margin-top: 14px; /* Added top margin */
+    margin-top: 14px;
     height: calc(100vh - 20px);
     overflow-y: auto;
     background: #ffffff;
@@ -57,20 +57,11 @@
     border-bottom: 1px solid #e0e0e0;
 }
 
-.section-title {
-    font-size: 1.5rem; /* Reduced font size */
-    margin: 0;
-}
-
-.section-title i {
-    color: #1976d2;
-}
-
 .announcement-list {
     display: flex;
     flex-direction: column;
     gap: 12px;
-    padding: 0 5px; /* Added small padding */
+    padding: 0 5px;
 }
 
 .announcement-card {
@@ -114,7 +105,6 @@
     font-size: 0.9rem;
 }
 
-/* Adjust scrollbar for smoother look */
 .announcement-container::-webkit-scrollbar {
     width: 6px;
 }
@@ -132,15 +122,10 @@
     background: #a8a8a8;
 }
 
-/* Responsive Styles */
 @media screen and (max-width: 1024px) {
     .announcement-container {
         margin-left: 80px;
         margin-right: 40px;
-    }
-    
-    .section-title {
-        font-size: 1.3rem;
     }
 }
 
@@ -196,10 +181,6 @@
 }
 
 @media screen and (max-width: 480px) {
-    .section-title {
-        font-size: 1.1rem;
-    }
-
     .announcement-container {
         padding: 10px;
         margin: 5px;
@@ -214,5 +195,6 @@
         padding: 6px 12px;
     }
 }
+
 </style>
 {% endblock %}
