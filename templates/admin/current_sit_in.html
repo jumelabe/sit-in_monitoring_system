@@ -10,6 +10,7 @@
         <a href="{{ url_for('admin.student_list') }}" class="menu-btn">Student List</a>
         <a href="{{ url_for('admin.current_sit_in') }}" class="menu-btn active">Current Sit-in</a>
         <a href="{{ url_for('admin.sit_in_records') }}" class="menu-btn">Sit-in Records</a>
+        <a href="{{ url_for('admin.computer_control') }}" class="menu-btn">Computer Control</a>
         <a href="{{ url_for('admin.reports') }}" class="menu-btn">Reports</a>
         <a href="{{ url_for('admin.feedback_reports') }}" class="menu-btn">View Feedback</a>
         <a href="{{ url_for('admin.leaderboards') }}" class="menu-btn">Leaderboards</a>
@@ -52,7 +53,7 @@
                                 <td>{{ sit_in.course }}</td>
                                 <td>{{ sit_in.year_level }}</td>
                                 <td>{{ sit_in.purpose }}</td>
-                                <td>{{ sit_in.sit_lab }}</td>
+                                <td>{{ sit_in.sit_lab|replace("Room ", "") }}</td>
                                 <td>
                                     <span class="badge rounded-pill 
                                         {% if sit_in.session >= 20 %}bg-success
@@ -122,7 +123,7 @@
                 .then(data => {
                     if (data.success) {
                         row.remove();
-                        alert('Session ended successfully');
+                        alert('Session ended successfully and computer has been marked as available');
                         location.reload();
                     } else {
                         alert(data.message || "Error ending session");
@@ -154,7 +155,7 @@
                 .then(data => {
                     if (data.success) {
                         row.remove();
-                        alert('Student rewarded and session ended successfully');
+                        alert('Student rewarded, session ended, and computer marked as available');
                         location.reload();
                     } else {
                         alert(data.message || "Error rewarding student");

@@ -1,523 +1,229 @@
 {% extends "base.html" %}
 
-{% block title %}{% endblock %}
+{% block title %}Dashboard - {% endblock %}
 
 {% block content %}
-<body>
-    <div class="dashboard-container">
-        <div class="sidebar">
-            <h1 class="dashboard-title">Dashboard</h1>
-            <a href="{{ url_for('student.dashboard') }}" class="menu-btn active">Dashboard</a>
-            <a href="{{ url_for('student.sit_in_history') }}" class="menu-btn">Sit-In History</a>
-            <a href="{{ url_for('student.reserve') }}" class="menu-btn">Reservation</a>
-            <a href="{{ url_for('student.announcements') }}" class="menu-btn">Announcement</a>
-            <a href="{{ url_for('student.resources') }}" class="menu-btn">Resources</a>
-            <a href="{{ url_for('auth.logout') }}" class="menu-btn logout-btn">Logout</a>
+<div class="dashboard-container">
+    <div class="sidebar">
+        <h1 class="dashboard-title">Dashboard</h1>
+        <div class="profile">
+            {% if student['profile_picture'] %}
+                <img src="{{ url_for('static', filename=student['profile_picture']) }}" alt="Profile" class="profile-pic">
+            {% else %}
+                <img src="{{ url_for('static', filename='default-avatar.jpg') }}" alt="Profile" class="profile-pic">
+            {% endif %}
+            <span class="profile-name">{{ student['firstname'] }} {{ student['lastname'] }}</span>
         </div>
-        
-        <div class="content">
-            <div class="container">
-                <!-- Student Information Section -->
-                <div class="student-info">
-                    <h2>Student Information</h2>
-                    <!-- Check if user has a profile picture -->
-                    <div class="profile-container">
-                        {% if user['profile_picture'] %}
-                            <img src="{{ url_for('static', filename=user['profile_picture']) }}" alt="Profile Picture" class="profile-pic">
-                        {% else %}
-                            <img src="{{ url_for('static', filename='default-avatar.jpg') }}" alt="Default Profile Picture" class="profile-pic">
-                        {% endif %}
-                    </div>
-                    <p><strong>Name:</strong> {{ user['firstname'] }}{% if user['midname'] %} {{ user['midname'] }}{% endif %} {{ user['lastname'] }}</p>
-                    <p><strong>Course:</strong> {{ user['course'] }}</p>
-                    <p><strong>Year:</strong> {{ user['year_level'] }}</p>
-                    <p><strong>Email:</strong> {{ user['email_address'] }}</p>
-                    <p><strong>Session Count:</strong> {{ user['session_count'] if user['session_count'] else 30 }}</p> <!-- Display session count -->
-                    <button class="edit-btn" onclick="openModal()">Edit</button>
-                </div>
-
-                <!-- Rules And Regulation Section -->
-                <div class="rules-regulation" style="width: 100%; max-width: 600px; margin-left: auto; margin-right: auto;">
-                    <h2>Rules And Regulation</h2>
-                    <center><strong><p>COLLEGE OF INFORMATION & COMPUTER STUDIES</p>
-                    <p>UNIVERSITY OF CEBU</p>
-                    <p>LABORATORY RULES AND REGULATIONS</p></strong></center>
-                    <p>To avoid embarrassment and maintain camaraderie with your friends and superiors at our laboratories, please observe the following:</p>
-                    <p>1. Maintain silence, proper decorum, and discipline inside the laboratory. Mobile phones, walkmans and other personal pieces of equipment must be switched off.</p>
-                    <p>2. Games are not allowed inside the lab. This includes computer-related games, card games and other games that may disturb the operation of the lab.</p>
-                    <p>3. Surfing the Internet is allowed only with the permission of the instructor. Downloading and installing of software are strictly prohibited.</p>
-                    <p>4. Getting access to other websites not related to the course (especially pornographic and illicit sites) is strictly prohibited.</p>
-                    <p>5. Deleting computer files and changing the set-up of the computer is a major offense.</p>
-                    <p>6. Observe computer time usage carefully. A fifteen-minute allowance is given for each use. Otherwise, the unit will be given to those who wish to "sit-in".</p>
-                    <p>7. Observe proper decorum while inside the laboratory.</p>
-                    <p>a. Do not get inside the lab unless the instructor is present.</p> 
-                    <p>b. All bags, knapsacks, and the likes must be deposited at the counter.</p> 
-                    <p>c. Follow the seating arrangement of your instructor.</p> 
-                    <p>d. At the end of class, all software programs must be closed.</p> 
-                    <p>e. Return all chairs to their proper places after using.</p> 
-                    <p>8. Chewing gum, eating, drinking, smoking, and other forms of vandalism are prohibited inside the lab.</p>
-                    <p>9. Anyone causing a continual disturbance will be asked to leave the lab. Acts or gestures offensive to the members of the community, including public display of physical intimacy, are not tolerated.</p>
-                    <p>10. Persons exhibiting hostile or threatening behavior such as yelling, swearing, or disregarding requests made by lab personnel will be asked to leave the lab.</p>
-                    <p>11. For serious offense, the lab personnel may call the Civil Security Office (CSU) for assistance.</p>
-                    <p>12. Any technical problem or difficulty must be addressed to the laboratory supervisor, student assistant or instructor immediately.</p>
-                    <strong><p>DISCIPLINARY ACTION</p></strong>
-                        <p> • First Offense - The Head or the Dean or OIC recommends to the Guidance Center for a suspension from classes for each offender.</p>
-                        <p> • Second and Subsequent Offenses - A recommendation for a heavier sanction will be endorsed to the Guidance Center.</p>
-                </div>
-            </div>
-        </div>
+        <a href="{{ url_for('student.dashboard') }}" class="menu-btn active">
+            <i class="fas fa-tachometer-alt"></i> Dashboard
+        </a>
+        <a href="{{ url_for('student.sit_in_history') }}" class="menu-btn">
+            <i class="fas fa-history"></i> Sit-In History
+        </a>
+        <a href="{{ url_for('student.reserve') }}" class="menu-btn">
+            <i class="fas fa-calendar-check"></i> Reservation
+        </a>
+        <a href="{{ url_for('student.lab_schedules') }}" class="menu-btn">
+            <i class="fas fa-calendar-alt"></i> Lab Schedules
+        </a>
+        <a href="{{ url_for('student.announcements') }}" class="menu-btn">
+            <i class="fas fa-bullhorn"></i> Announcement
+        </a>
+        <a href="{{ url_for('student.resources') }}" class="menu-btn">
+            <i class="fas fa-book"></i> Resources
+        </a>
+        <a href="{{ url_for('auth.logout') }}" class="menu-btn logout-btn">
+            <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
     </div>
-
     
-    <!-- Edit Profile Modal -->
-<div id="editModal" class="modal">
-    <div class="modal-content">
-        <span class="close-btn" onclick="closeModal()">&times;</span>
-        <h2 class="modal-title">Edit Profile</h2>
-        
-        <form id="editProfileForm" action="{{ url_for('student.edit_profile') }}" method="POST" enctype="multipart/form-data">
-            <!-- Add CSRF Token -->
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            
-            <!-- Profile Picture Section -->
-            <div class="form-group center">
-                <label for="profile_picture">Profile Picture</label>
-                <div class="profile-pic-container">
-                    {% if user['profile_picture'] %}
-                        <img src="{{ url_for('static', filename=user['profile_picture']) }}" alt="Profile Picture" class="profile-pic" id="editProfilePic">
-                    {% else %}
-                        <img src="{{ url_for('static', filename='/default-avatar.jpg') }}" alt="Default Profile Picture" class="profile-pic" id="editProfilePic">
-                    {% endif %}
+    <div class="main-content">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-lg-4">
+                    <!-- Student Information Card -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h3 class="card-title">Student Information</h3>
+                        </div>
+                        <div class="card-body text-center">
+                            <!-- Profile Picture -->
+                            <div class="mb-4">
+                                {% if student['profile_picture'] %}
+                                    <img src="{{ url_for('static', filename=student['profile_picture']) }}" alt="Profile Picture" class="img-thumbnail rounded-circle" style="width: 150px; height: 150px; object-fit: cover;">
+                                {% else %}
+                                    <img src="{{ url_for('static', filename='default-avatar.jpg') }}" alt="Default Profile Picture" class="img-thumbnail rounded-circle" style="width: 150px; height: 150px; object-fit: cover;">
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Student Details -->
+                            <div class="student-details text-start">
+                                <p><strong>Name:</strong> {{ student['firstname'] }}{% if student['midname'] %} {{ student['midname'] }}{% endif %} {{ student['lastname'] }}</p>
+                                <p><strong>ID Number:</strong> {{ student['idno'] }}</p>
+                                <p><strong>Course:</strong> {{ student['course'] }}</p>
+                                <p><strong>Year:</strong> {{ student['year_level'] }}</p>
+                                <p><strong>Email:</strong> {{ student['email_address'] }}</p>
+                                <p><strong>Session Count:</strong> {{ student['session_count'] if student['session_count'] else 0 }}</p>
+                            </div>
+                            
+                            <button class="btn btn-primary mt-3" onclick="openModal()">
+                                <i class="fas fa-edit"></i> Edit Profile
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <input type="file" name="profile_picture" accept="image/*" onchange="previewImage(event)">
+                
+                <div class="col-lg-8">
+                    <!-- Rules And Regulation Card -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Laboratory Rules And Regulation</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="text-center mb-4">
+                                <h4>COLLEGE OF INFORMATION & COMPUTER STUDIES</h4>
+                                <h4>UNIVERSITY OF CEBU</h4>
+                                <h4>LABORATORY RULES AND REGULATIONS</h4>
+                            </div>
+                            
+                            <p>To avoid embarrassment and maintain camaraderie with your friends and superiors at our laboratories, please observe the following:</p>
+                            
+                            <ol class="mb-4">
+                                <li>Maintain silence, proper decorum, and discipline inside the laboratory. Mobile phones, walkmans and other personal pieces of equipment must be switched off.</li>
+                                <li>Games are not allowed inside the lab. This includes computer-related games, card games and other games that may disturb the operation of the lab.</li>
+                                <li>Surfing the Internet is allowed only with the permission of the instructor. Downloading and installing of software are strictly prohibited.</li>
+                                <li>Getting access to other websites not related to the course (especially pornographic and illicit sites) is strictly prohibited.</li>
+                                <li>Deleting computer files and changing the set-up of the computer is a major offense.</li>
+                                <li>Observe computer time usage carefully. A fifteen-minute allowance is given for each use. Otherwise, the unit will be given to those who wish to "sit-in".</li>
+                                <li>Observe proper decorum while inside the laboratory.
+                                    <ul>
+                                        <li>Do not get inside the lab unless the instructor is present.</li>
+                                        <li>All bags, knapsacks, and the likes must be deposited at the counter.</li>
+                                        <li>Follow the seating arrangement of your instructor.</li>
+                                        <li>At the end of class, all software programs must be closed.</li>
+                                        <li>Return all chairs to their proper places after using.</li>
+                                    </ul>
+                                </li>
+                                <li>Chewing gum, eating, drinking, smoking, and other forms of vandalism are prohibited inside the lab.</li>
+                                <li>Anyone causing a continual disturbance will be asked to leave the lab. Acts or gestures offensive to the members of the community, including public display of physical intimacy, are not tolerated.</li>
+                                <li>Persons exhibiting hostile or threatening behavior such as yelling, swearing, or disregarding requests made by lab personnel will be asked to leave the lab.</li>
+                                <li>For serious offense, the lab personnel may call the Civil Security Office (CSU) for assistance.</li>
+                                <li>Any technical problem or difficulty must be addressed to the laboratory supervisor, student assistant or instructor immediately.</li>
+                            </ol>
+                            
+                            <div class="disciplinary-action">
+                                <h4>DISCIPLINARY ACTION</h4>
+                                <ul>
+                                    <li>First Offense - The Head or the Dean or OIC recommends to the Guidance Center for a suspension from classes for each offender.</li>
+                                    <li>Second and Subsequent Offenses - A recommendation for a heavier sanction will be endorsed to the Guidance Center.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-
-            <!-- Input Fields -->
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="firstname">First Name</label>
-                    <input type="text" id="firstname" name="firstname" value="{{ user['firstname'] }}" required>
-                </div>
-                <div class="form-group">
-                    <label for="midname">Middle Name</label>
-                    <input type="text" id="midname" name="midname" value="{{ user['midname'] }}">
-                </div>
-                <div class="form-group">
-                    <label for="lastname">Last Name</label>
-                    <input type="text" id="lastname" name="lastname" value="{{ user['lastname'] }}" required>
-                </div>
-            </div>
-
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="course">Course</label>
-                    <input type="text" name="course" value="{{ user['course'] }}">
-                </div>
-                <div class="form-group">
-                    <label for="year_level">Year Level</label>
-                    <input type="number" name="year_level" value="{{ user['year_level'] }}">
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label for="email_address">Email</label>
-                <input type="email" name="email_address" value="{{ user['email_address'] }}">
-            </div>
-
-            <!-- Save Button -->
-            <button type="submit" class="save-btn">Save Changes</button>
-        </form>
+        </div>
     </div>
 </div>
 
-<style>
-    body {
-        background: linear-gradient(120deg, #f5f7fa 0%, #c3cfe2 100%);
-        min-height: 100vh;
+<!-- Edit Profile Modal -->
+<div id="editModal" class="modal">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Edit Profile</h3>
+                <button type="button" class="close-modal" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="editProfileForm" action="{{ url_for('student.edit_profile') }}" method="POST" enctype="multipart/form-data">
+                    <!-- Add CSRF Token -->
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    
+                    <!-- Profile Picture Section -->
+                    <div class="form-group text-center mb-4">
+                        <label for="profile_picture" class="form-label mb-2">Profile Picture</label>
+                        <div class="d-flex justify-content-center mb-3">
+                            {% if student['profile_picture'] %}
+                                <img src="{{ url_for('static', filename=student['profile_picture']) }}" alt="Profile Picture" class="img-thumbnail rounded-circle" style="width: 120px; height: 120px; object-fit: cover;" id="editProfilePic">
+                            {% else %}
+                                <img src="{{ url_for('static', filename='default-avatar.jpg') }}" alt="Default Profile Picture" class="img-thumbnail rounded-circle" style="width: 120px; height: 120px; object-fit: cover;" id="editProfilePic">
+                            {% endif %}
+                        </div>
+                        <input type="file" class="form-control" name="profile_picture" accept="image/*" onchange="previewImage(event)">
+                    </div>
+
+                    <!-- Form Grid -->
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="firstname" class="form-label">First Name</label>
+                            <input type="text" id="firstname" name="firstname" value="{{ student['firstname'] }}" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="midname" class="form-label">Middle Name</label>
+                            <input type="text" id="midname" name="midname" value="{{ student['midname'] }}" class="form-control">
+                        </div>
+                    </div>
+                    
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="lastname" class="form-label">Last Name</label>
+                            <input type="text" id="lastname" name="lastname" value="{{ student['lastname'] }}" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="course" class="form-label">Course</label>
+                            <input type="text" name="course" value="{{ student['course'] }}" class="form-control">
+                        </div>
+                    </div>
+                    
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="year_level" class="form-label">Year Level</label>
+                            <input type="number" name="year_level" value="{{ student['year_level'] }}" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="email_address" class="form-label">Email</label>
+                            <input type="email" name="email_address" value="{{ student['email_address'] }}" class="form-control">
+                        </div>
+                    </div>
+                    
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Modal functionality
+    function openModal() {
+        document.getElementById('editModal').style.display = 'block';
     }
 
-    .dashboard-container {
-        min-height: 100vh;
-        display: flex;
+    function closeModal() {
+        document.getElementById('editModal').style.display = 'none';
     }
 
-    .content {
-        flex: 1;
-        display: flex;
-        align-items: stretch;
-        justify-content: center;
-        padding: 40px 0;
-        min-height: 100vh;
-    }
-
-    .container {
-        display: flex;
-        gap: 0; /* Remove space between the two sections */
-        width: 100%;
-        max-width: 1200px;
-        margin: 0 auto;
-        align-items: stretch;
-        min-height: 75vh;
-    }
-
-    .student-info {
-        flex: 0 0 340px;
-        background: #fff;
-        padding: 36px 28px 32px 28px;
-        border-radius: 18px 0 0 18px; /* Only left corners rounded */
-        box-shadow: 0 8px 32px rgba(74, 53, 153, 0.10), 0 1.5px 6px rgba(0,0,0,0.04);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        margin-top: 0;
-        margin-bottom: 0;
-        min-height: 100%;
-        height: 100%;
-    }
-
-    .student-info h2 {
-        font-size: 27px;
-        color: #4a3599;
-        margin-bottom: 22px;
-        font-weight: 700;
-        letter-spacing: 0.5px;
-    }
-
-    .profile-container {
-        width: 150px;
-        height: 150px;
-        border-radius: 50%;
-        overflow: hidden;
-        margin-bottom: 22px;
-        border: 3px solid #4a3599;
-        background: #f5f5f5;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .profile-pic {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        object-position: center;
-    }
-
-    .student-info p {
-        font-size: 16px;
-        color: #333;
-        margin-bottom: 10px;
-        width: 100%;
-        text-align: left;
-        padding-left: 8px;
-    }
-
-    .student-info strong {
-        color: #4a3599;
-        font-weight: 600;
-    }
-
-    .edit-btn {
-        margin-top: 18px;
-        width: 100%;
-        background: #4a3599; /* Removed gradient, now solid color */
-        color: #fff;
-        border: none;
-        border-radius: 8px;
-        padding: 12px 0;
-        font-size: 16px;
-        font-weight: 600;
-        box-shadow: 0 2px 8px rgba(76, 63, 153, 0.10);
-        transition: background 0.2s, box-shadow 0.2s, transform 0.2s;
-    }
-
-    .edit-btn:hover {
-        background: #3a267a;
-        box-shadow: 0 4px 16px rgba(76, 63, 153, 0.18);
-        transform: translateY(-2px) scale(1.03);
-    }
-
-    .rules-regulation {
-        flex: 1 1 0;
-        background: #fff;
-        padding: 44px 38px 38px 38px;
-        border-radius: 0 18px 18px 0; /* Only right corners rounded */
-        box-shadow: 0 8px 32px rgba(74, 53, 153, 0.10), 0 1.5px 6px rgba(0,0,0,0.04);
-        margin-top: 0;
-        margin-bottom: 0;
-        min-width: 0;
-        min-height: 100%;
-        height: 100%;
-        overflow-y: auto;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-    }
-
-    .rules-regulation h2 {
-        font-size: 29px;
-        color: #4a3599;
-        margin-bottom: 24px;
-        font-weight: 700;
-        letter-spacing: 0.5px;
-        text-align: center;
-    }
-
-    .rules-regulation p {
-        font-size: 16px;
-        line-height: 1.8;
-        margin-bottom: 13px;
-        color: #444;
-        text-align: justify;
-        max-width: 800px;
-    }
-
-    .rules-regulation strong p {
-        font-size: 18px;
-        color: #4a3599;
-        margin: 18px 0;
-        text-align: center;
-        font-weight: 600;
-    }
-
-    /* Custom Scrollbar */
-    .rules-regulation::-webkit-scrollbar {
-        width: 10px;
-    }
-    .rules-regulation::-webkit-scrollbar-track {
-        background: #f5f5f5;
-        border-radius: 5px;
-    }
-    .rules-regulation::-webkit-scrollbar-thumb {
-        background: #4a3599;
-        border-radius: 5px;
-        transition: all 0.3s ease;
-    }
-    .rules-regulation::-webkit-scrollbar-thumb:hover {
-        background: #3a267a;
-    }
-
-    .modal {
-        display: none;
-        position: fixed;
-        z-index: 1000;
-        left: 0;
-        top: 0;
-        width: 100vw;
-        height: 100vh;
-        overflow: auto;
-        background: rgba(44, 44, 84, 0.25);
-        align-items: center;
-        justify-content: center;
-        transition: background 0.2s;
-    }
-
-    .modal-content {
-        background: #fff;
-        width: 100%;
-        max-width: 430px; /* Increased from 370px to 430px */
-        padding: 32px 28px 24px 28px; /* Slightly more padding */
-        border-radius: 18px;
-        position: relative;
-        box-shadow: 0 8px 32px rgba(74, 53, 153, 0.18), 0 1.5px 6px rgba(0,0,0,0.08);
-        animation: fadeIn 0.3s ease-in-out;
-        margin: 0 auto;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-    }
-
-    .modal-title {
-        font-size: 22px;
-        font-weight: 700;
-        color: #4a3599;
-        margin-bottom: 18px;
-        text-align: center;
-        letter-spacing: 0.5px;
-    }
-
-    .close-btn {
-        position: absolute;
-        top: 12px;
-        right: 18px;
-        font-size: 22px;
-        color: #888;
-        background: none;
-        border: none;
-        cursor: pointer;
-        transition: color 0.2s;
-        z-index: 2;
-    }
-    .close-btn:hover {
-        color: #4a3599;
-    }
-
-    .modal-content .form-group label {
-        font-weight: 600;
-        color: #4a3599;
-        margin-bottom: 4px;
-        font-size: 15px;
-    }
-
-    .modal-content input[type="text"],
-    .modal-content input[type="number"],
-    .modal-content input[type="email"] {
-        width: 100%;
-        padding: 9px 12px;
-        border: 1.5px solid #d1d5db;
-        border-radius: 7px;
-        font-size: 15px;
-        margin-bottom: 12px;
-        background: #f8f8fc;
-        transition: border 0.2s;
-    }
-    .modal-content input[type="text"]:focus,
-    .modal-content input[type="number"]:focus,
-    .modal-content input[type="email"]:focus {
-        border: 1.5px solid #4a3599;
-        outline: none;
-        background: #f3f1fa;
-    }
-
-    .modal-content input[type="file"] {
-        margin-top: 8px;
-        margin-bottom: 12px;
-        font-size: 14px;
-    }
-
-    .modal-content .profile-pic-container {
-        width: 90px;
-        height: 90px;
-        border-radius: 50%;
-        overflow: hidden;
-        margin: 0 auto 12px auto;
-        border: 2px solid #4a3599;
-        background: #f5f5f5;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    .modal-content .profile-pic {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-
-    .modal-content .form-row {
-        display: flex;
-        gap: 10px;
-        margin-bottom: 0;
-    }
-    .modal-content .form-row .form-group {
-        flex: 1;
-        margin-bottom: 0;
-    }
-
-    .modal-content .save-btn {
-        background: #4a3599;
-        color: #fff;
-        border: none;
-        padding: 12px 0;
-        width: 100%;
-        border-radius: 8px;
-        font-size: 16px;
-        font-weight: 600;
-        cursor: pointer;
-        margin-top: 10px;
-        transition: background 0.2s, box-shadow 0.2s;
-        box-shadow: 0 2px 8px rgba(76, 63, 153, 0.10);
-    }
-    .modal-content .save-btn:hover {
-        background: #3a267a;
-        box-shadow: 0 4px 16px rgba(76, 63, 153, 0.18);
-    }
-
-    @media (max-width: 500px) {
-        .modal-content {
-            max-width: 99vw;
-            padding: 12px 2vw;
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+        const modal = document.getElementById('editModal');
+        if (event.target == modal) {
+            closeModal();
         }
     }
 
-    @media (max-width: 1100px) {
-        .container {
-            flex-direction: column;
-            gap: 30px;
-            align-items: stretch;
-            min-height: unset;
+    // Preview image when selecting a new file
+    function previewImage(event) {
+        const reader = new FileReader();
+        reader.onload = function() {
+            const output = document.getElementById('editProfilePic');
+            output.src = reader.result;
         }
-        .student-info, .rules-regulation {
-            margin: 0 auto;
-            width: 100%;
-            max-width: 700px;
-            min-height: unset;
-            height: auto;
-            border-radius: 18px;
-        }
-        .rules-regulation {
-            max-height: 600px;
-        }
+        reader.readAsDataURL(event.target.files[0]);
     }
-
-    @media (max-width: 700px) {
-        .content {
-            padding: 18px 0;
-        }
-        .container {
-            padding: 8px;
-            gap: 18px;
-        }
-        .student-info, .rules-regulation {
-            padding: 18px 8px 18px 8px;
-            border-radius: 10px;
-            box-shadow: 0 2px 8px rgba(74, 53, 153, 0.10);
-            min-height: unset;
-            height: auto;
-        }
-        .rules-regulation {
-            max-height: 400px;
-        }
-        .rules-regulation h2, .student-info h2 {
-            font-size: 21px;
-        }
-        .profile-container {
-            width: 110px;
-            height: 110px;
-        }
-    }
-</style>
- 
-    <script>
-            setTimeout(function() {
-            let alerts = document.querySelectorAll('.alert');
-            alerts.forEach(alert => {
-                alert.style.transition = "opacity 0.5s";
-                alert.style.opacity = "0";
-                setTimeout(() => alert.remove(), 500);
-            });
-        }, 3000);
-
-        function openModal() {
-            document.getElementById("editModal").style.display = "flex";
-        }
-
-        function closeModal() {
-            document.getElementById("editModal").style.display = "none";
-        }
-
-        function previewImage(event) {
-            const reader = new FileReader();
-            reader.onload = function() {
-                const output = document.getElementById('editProfilePic');
-                output.src = reader.result;
-            };
-            reader.readAsDataURL(event.target.files[0]);
-        }
-
-        document.getElementById('editProfileForm').addEventListener('submit', function() {
-            closeModal(); // Close the modal after form submission
-        });
-    </script>
-</body>
-</html>
+</script>
 {% endblock %}

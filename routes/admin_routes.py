@@ -331,6 +331,13 @@ def end_session():
             WHERE id_number = ? AND logout_time IS NULL
         """, (id_number,))
         
+        # Find and update the computer status to available
+        cursor.execute("""
+            UPDATE computers 
+            SET status = 'available', student_id = NULL 
+            WHERE student_id = ?
+        """, (id_number,))
+        
         # Deduct 1 session count
         cursor.execute("""
             UPDATE students SET session_count = CASE
@@ -483,6 +490,13 @@ def reward_student():
             WHERE id_number = ? AND logout_time IS NULL
         """, (id_number,))
 
+        # Find and update the computer status to available
+        cursor.execute("""
+            UPDATE computers 
+            SET status = 'available', student_id = NULL 
+            WHERE student_id = ?
+        """, (id_number,))
+        
         # Deduct 1 session count
         cursor.execute("""
             UPDATE students SET session_count = CASE
@@ -719,6 +733,27 @@ def sit_in_student():
     if cursor.fetchone()[0] > 0:
         conn.close()
         return jsonify({'success': False, 'message': 'Student already has an active session'}), 400
+    
+    # Check if student has a pending reservation
+    cursor.execute(
+        "SELECT id, lab_room, purpose FROM computer_reservation_requests WHERE student_id = ? AND status = 'pending' ORDER BY date ASC, time_in ASC LIMIT 1",
+        (id_number,)
+    )
+    pending_reservation = cursor.fetchone()
+    
+    if pending_reservation:
+        # If there's a pending reservation, suggest using that instead
+        reservation_id = pending_reservation['id']
+        reservation_lab = pending_reservation['lab_room']
+        reservation_purpose = pending_reservation['purpose']
+        
+        conn.close()
+        return jsonify({
+            'success': False, 
+            'has_reservation': True,
+            'message': f'Student has a pending reservation for {reservation_lab} with purpose: {reservation_purpose}. Please approve that reservation instead.',
+            'reservation_id': reservation_id
+        }), 400
 
     try:
         # Insert sit-in record (add date field)
@@ -737,3 +772,590 @@ def sit_in_student():
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
     finally:
         conn.close()
+
+@admin_bp.route('/computer_control')
+def computer_control():
+    if session.get('user_type') != 'admin':
+        flash("Admin access required.", "danger")
+        return redirect(url_for('auth.login'))
+
+    # Check if reset is requested
+    if request.args.get('reset') == 'true':
+        if reset_computers_table():
+            flash("Computer tables have been reset and initialized with 50 computers per lab.", "success")
+        else:
+            flash("Failed to reset computer tables.", "danger")
+        return redirect(url_for('admin.computer_control'))
+
+    # Ensure computers table exists and has sample data
+    ensure_computers_table()
+    initialize_sample_computers()
+    
+    # Ensure reservation table exists
+    ensure_reservation_table()
+
+    selected_lab = request.args.get('lab')
+    active_tab = request.args.get('tab', 'computers')
+
+    # Fetch lab stats and lab rooms
+    lab_stats = get_lab_computer_stats()
+    lab_rooms = get_lab_rooms()
+
+    # Fetch computers for selected lab
+    computers = []
+    if selected_lab:
+        computers = get_computers_by_lab(selected_lab)
+
+    # Fetch reservation requests
+    requests = get_reservation_requests()
+    
+    # Get filters from request args
+    filters = {
+        'student_id': request.args.get('student_id', ''),
+        'lab_room': request.args.get('lab_room', ''),
+        'status': request.args.get('status', ''),
+        'action': request.args.get('action', '')
+    }
+    
+    # Fetch reservation logs with filters
+    logs = get_reservation_logs(filters)
+    print(f"DEBUG: Fetched {len(logs)} logs before filtering")
+    
+    # Filter logs to focus on approved and denied reservations if no specific filter is set
+    # Commenting out this filtering to ensure all logs are shown
+    """
+    if not filters['action']:
+        # Only show approved and denied logs by default
+        logs = [log for log in logs if log['action'] in ['approved', 'denied']]
+        print(f"DEBUG: After filtering for approved/denied actions: {len(logs)} logs")
+    """
+    
+    # Print the first few logs for debugging
+    if logs:
+        print("DEBUG: First log details:")
+        print(f"  ID: {logs[0]['id']}")
+        print(f"  Action: {logs[0]['action']}")
+        print(f"  Status: {logs[0]['status']}")
+        print(f"  Student ID: {logs[0]['student_id']}")
+    else:
+        print("DEBUG: No logs found after filtering")
+    
+    # Fetch reservation logs with filters
+    logs = get_reservation_logs(filters)
+    
+    # We're no longer filtering logs by action to show all logs
+    # if not filters['action']:
+    #     logs = [log for log in logs if log['action'] in ['approved', 'denied']]
+    
+    # Get unique student IDs, lab rooms, statuses, and actions for filter dropdowns
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT DISTINCT student_id FROM computer_reservation_requests ORDER BY student_id")
+    student_ids = [row[0] for row in cursor.fetchall()]
+    
+    cursor.execute("SELECT DISTINCT lab_room FROM computer_reservation_requests ORDER BY lab_room")
+    log_lab_rooms = [row[0] for row in cursor.fetchall()]
+    
+    cursor.execute("SELECT DISTINCT status FROM computer_reservation_requests ORDER BY status")
+    statuses = [row[0] for row in cursor.fetchall()]
+    
+    # Add distinct actions from reservation_logs
+    cursor.execute("SELECT DISTINCT action FROM reservation_logs ORDER BY action")
+    actions = [row[0] for row in cursor.fetchall() if row[0]]
+    
+    # If no actions found in the logs, provide default actions
+    if not actions:
+        actions = ['approved', 'denied', 'created', 'cancelled']
+    
+    conn.close()
+
+    return render_template(
+        'admin/computer_control.html',
+        lab_stats=lab_stats,
+        lab_rooms=lab_rooms,
+        selected_lab=selected_lab,
+        computers=computers,
+        requests=requests,
+        logs=logs,
+        student_ids=student_ids,
+        log_lab_rooms=log_lab_rooms,
+        statuses=statuses,
+        actions=actions,
+        filters=filters,
+        active_tab=active_tab
+    )
+
+@admin_bp.route('/bulk_update_computer_status', methods=['POST'])
+def bulk_update_computer_status():
+    if session.get('user_type') != 'admin':
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+        flash("Admin access required.", "danger")
+        return redirect(url_for('auth.login'))
+    
+    # Check if it's an AJAX request
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+    
+    try:
+        # Handle form data or JSON data
+        if request.is_json:
+            data = request.get_json()
+            status = data.get('status')
+            computer_ids = data.get('computer_ids', [])
+            usage_type = data.get('usage_type')
+            student_id = data.get('student_id')
+        else:
+            data = request.form
+            status = data.get('status')
+            computer_ids = data.getlist('computer_ids[]')
+            usage_type = data.get('usage_type')
+            student_id = data.get('student_id')
+        
+        if not status or not computer_ids:
+            if is_ajax:
+                return jsonify({'success': False, 'message': 'Missing parameters for bulk update'}), 400
+            flash('Missing parameters for bulk update', 'danger')
+            return redirect(url_for('admin.computer_control'))
+        
+        # Handle "in_use" status differently based on usage type
+        if status == 'in_use':
+            # Class use case - no student ID required
+            if usage_type == 'class':
+                conn = get_connection()
+                cursor = conn.cursor()
+                
+                # Update each computer as in use without student_id
+                success_count = 0
+                for computer_id in computer_ids:
+                    try:
+                        cursor.execute(
+                            "UPDATE computers SET status = ?, student_id = NULL WHERE id = ?",
+                            ('in_use', computer_id)
+                        )
+                        success_count += 1
+                    except Exception as e:
+                        print(f"Error updating computer {computer_id}: {e}")
+                
+                conn.commit()
+                conn.close()
+                
+                if is_ajax:
+                    return jsonify({
+                        'success': True, 
+                        'message': f'{success_count} computers marked as in use for class'
+                    })
+                flash(f'{success_count} computers marked as in use for class', 'success')
+                return redirect(url_for('admin.computer_control', lab=request.args.get('lab', '')))
+                
+            # Individual use requires student ID
+            elif usage_type == 'individual' and student_id:
+                # Verify student exists and has active sit-in
+                student = get_student_by_id(student_id)
+                if not student:
+                    if is_ajax:
+                        return jsonify({
+                            'success': False, 
+                            'message': 'Student not found. Please check the ID and try again.'
+                        }), 404
+                    flash('Student not found. Please check the ID and try again.', 'danger')
+                    return redirect(url_for('admin.computer_control', lab=request.args.get('lab', '')))
+                
+                conn = get_connection()
+                cursor = conn.cursor()
+                
+                # Check if student has active sit-in
+                cursor.execute(
+                    "SELECT COUNT(*) FROM sit_in_records WHERE id_number = ? AND logout_time IS NULL",
+                    (student_id,)
+                )
+                
+                if cursor.fetchone()[0] == 0:
+                    conn.close()
+                    if is_ajax:
+                        return jsonify({
+                            'success': False, 
+                            'message': 'Student does not have an active sit-in session. They must start a sit-in session first.'
+                        }), 400
+                    flash('Student does not have an active sit-in session. They must start a sit-in session first.', 'danger')
+                    return redirect(url_for('admin.computer_control', lab=request.args.get('lab', '')))
+                
+                # Update each computer
+                success_count = 0
+                for computer_id in computer_ids:
+                    try:
+                        cursor.execute(
+                            "UPDATE computers SET status = ?, student_id = ? WHERE id = ?",
+                            ('in_use', student_id, computer_id)
+                        )
+                        success_count += 1
+                    except Exception as e:
+                        print(f"Error updating computer {computer_id}: {e}")
+                
+                conn.commit()
+                conn.close()
+                
+                if is_ajax:
+                    return jsonify({
+                        'success': True, 
+                        'message': f'{success_count} computers assigned to student {student_id}'
+                    })
+                flash(f'{success_count} computers assigned to student {student_id}', 'success')
+                return redirect(url_for('admin.computer_control', lab=request.args.get('lab', '')))
+            else:
+                # If neither class nor valid individual, show error
+                if is_ajax:
+                    return jsonify({
+                        'success': False, 
+                        'message': 'For individual use, a valid student ID is required'
+                    }), 400
+                flash('For individual use, a valid student ID is required', 'danger')
+                return redirect(url_for('admin.computer_control', lab=request.args.get('lab', '')))
+        
+        # Handle 'available' status (we removed maintenance)
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Update each computer
+        success_count = 0
+        for computer_id in computer_ids:
+            try:
+                # For bulk operations, directly update the database
+                cursor.execute(
+                    "UPDATE computers SET status = ?, student_id = NULL WHERE id = ?",
+                    ('available', computer_id)
+                )
+                success_count += 1
+            except Exception as e:
+                print(f"Error updating computer {computer_id}: {e}")
+        
+        conn.commit()
+        conn.close()
+        
+        if is_ajax:
+            return jsonify({
+                'success': True, 
+                'message': f'{success_count} of {len(computer_ids)} computers updated successfully!'
+            })
+        flash(f'{success_count} of {len(computer_ids)} computers updated successfully!', 'success')
+        
+    except Exception as e:
+        if 'conn' in locals():
+            conn.rollback()
+        if is_ajax:
+            return jsonify({'success': False, 'message': f'Error in bulk update: {str(e)}'}), 500
+        flash(f'Error in bulk update: {str(e)}', 'danger')
+    finally:
+        if 'conn' in locals():
+            conn.close()
+    
+    return redirect(url_for('admin.computer_control', lab=request.args.get('lab', '')))
+
+@admin_bp.route('/update_computer_status_route', methods=['POST'])
+def update_computer_status_route():
+    if session.get('user_type') != 'admin':
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+        return redirect(url_for('auth.login'))
+    
+    # Check if it's an AJAX request
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+    
+    # Handle form data or JSON data
+    if request.is_json:
+        data = request.get_json()
+    else:
+        data = request.form
+    
+    # Get basic parameters
+    computer_id = data.get('computer_id')
+    status = data.get('status')
+    student_id = data.get('student_id')
+    
+    # Validate required parameters
+    if not computer_id or not status:
+        if is_ajax:
+            return jsonify({'success': False, 'message': 'Missing parameters'}), 400
+        flash('Missing parameters', 'danger')
+        return redirect(url_for('admin.computer_control', lab=request.args.get('lab', '')))
+    
+    # Since we removed maintenance, only allow 'available' or 'in_use'
+    if status not in ['available', 'in_use']:
+        status = 'available'  # Default to available for safety
+    
+    # If status is "in_use", student_id is required
+    if status == 'in_use' and not student_id:
+        if is_ajax:
+            return jsonify({'success': False, 'message': 'Student ID is required when marking a computer as in use'}), 400
+        flash('Student ID is required when marking a computer as in use', 'danger')
+        return redirect(url_for('admin.computer_control', lab=request.args.get('lab', '')))
+    
+    # Handle "in_use" status with student_id
+    if status == 'in_use' and student_id:
+        # Check if student exists
+        student = get_student_by_id(student_id)
+        if not student:
+            if is_ajax:
+                return jsonify({'success': False, 'message': 'Student not found. Please check the ID and try again.'}), 404
+            flash('Student not found. Please check the ID and try again.', 'danger')
+            return redirect(url_for('admin.computer_control', lab=request.args.get('lab', '')))
+        
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            # Check if the student ID exists in the sit_in_records with active session
+            cursor.execute(
+                "SELECT COUNT(*) FROM sit_in_records WHERE id_number = ? AND logout_time IS NULL",
+                (student_id,)
+            )
+            
+            if cursor.fetchone()[0] == 0:
+                conn.close()
+                if is_ajax:
+                    return jsonify({'success': False, 'message': 'Student does not have an active sit-in session. They must start a sit-in session first.'}), 400
+                flash('Student does not have an active sit-in session. They must start a sit-in session first.', 'danger')
+                return redirect(url_for('admin.computer_control', lab=request.args.get('lab', '')))
+            
+            # Get computer info
+            cursor.execute(
+                "SELECT status, lab_room, pc_number FROM computers WHERE id = ?", 
+                (computer_id,)
+            )
+            computer = cursor.fetchone()
+            if not computer:
+                conn.close()
+                if is_ajax:
+                    return jsonify({'success': False, 'message': 'Computer not found. Please refresh and try again.'}), 404
+                flash('Computer not found. Please refresh and try again.', 'danger')
+                return redirect(url_for('admin.computer_control', lab=request.args.get('lab', '')))
+                
+            if computer['status'] == 'in_use':
+                # If the computer is already in use by someone else, show an error
+                cursor.execute(
+                    "SELECT student_id FROM computers WHERE id = ?",
+                    (computer_id,)
+                )
+                current_student = cursor.fetchone()
+                if current_student and current_student['student_id'] != student_id:
+                    conn.close()
+                    if is_ajax:
+                        return jsonify({'success': False, 'message': 'This computer is already in use by another student. Please select another computer.'}), 400
+                    flash('This computer is already in use by another student. Please select another computer.', 'danger')
+                    return redirect(url_for('admin.computer_control', lab=request.args.get('lab', '')))
+            
+            # Update computer status - only mark as in use, don't create sit-in record
+            cursor.execute(
+                "UPDATE computers SET status = ?, student_id = ? WHERE id = ?",
+                (status, student_id, computer_id)
+            )
+            
+            conn.commit()
+            conn.close()
+            
+            if is_ajax:
+                return jsonify({'success': True, 'message': 'Computer assigned to student successfully'})
+            
+            flash('Computer assigned to student successfully!', 'success')
+            
+        except Exception as e:
+            conn.rollback()
+            if is_ajax:
+                return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
+            flash(f'Error: {str(e)}', 'danger')
+            
+        finally:
+            conn.close()
+        
+        return redirect(url_for('admin.computer_control', lab=request.args.get('lab', '')))
+    
+    # Handle available status
+    try:
+        # Update the computer to available and clear student_id
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE computers SET status = ?, student_id = NULL WHERE id = ?",
+            (status, computer_id)
+        )
+        conn.commit()
+        conn.close()
+        
+        if is_ajax:
+            return jsonify({'success': True, 'message': 'Computer status updated successfully'})
+        
+        flash('Computer status updated successfully!', 'success')
+    except Exception as e:
+        if is_ajax:
+            return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
+        flash(f'Error: {str(e)}', 'danger')
+    
+    return redirect(url_for('admin.computer_control', lab=request.args.get('lab', '')))
+
+@admin_bp.route('/approve_reservation/<int:request_id>', methods=['POST'])
+def approve_reservation(request_id):
+    if session.get('user_type') != 'admin':
+        flash("Admin access required.", "danger")
+        return redirect(url_for('auth.login'))
+    
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        print(f"DEBUG: Starting approval process for reservation {request_id}")
+        
+        # Get the reservation request
+        cursor.execute("SELECT * FROM computer_reservation_requests WHERE id = ?", (request_id,))
+        request_data = cursor.fetchone()
+        if not request_data:
+            flash("Reservation request not found.", "danger")
+            return redirect(url_for('admin.computer_control', tab='requests'))
+        
+        print(f"DEBUG: Found reservation data: {dict(request_data)}")
+        
+        # Get student ID
+        student_id = request_data['student_id']
+        
+        # Check if student already has an active sit-in session
+        cursor.execute(
+            "SELECT COUNT(*) FROM sit_in_records WHERE id_number = ? AND logout_time IS NULL",
+            (student_id,)
+        )
+        if cursor.fetchone()[0] > 0:
+            flash(f"Student {student_id} already has an active sit-in session. Cannot approve another reservation.", "danger")
+            return redirect(url_for('admin.computer_control', tab='requests'))
+        
+        # Format the lab room to match the computers table format (e.g., "Room 524")
+        # The computers table uses "Room 524" format while reservation might use just "524"
+        lab_room_value = request_data['lab_room']
+        if not lab_room_value.startswith("Room "):
+            lab_room = f"Room {lab_room_value}"
+        else:
+            lab_room = lab_room_value
+        
+        computer_number = request_data['computer_number']
+        
+        print(f"DEBUG: Looking for computer in lab {lab_room}, number {computer_number}")
+        
+        # Check if the lab room exists in the computers table
+        cursor.execute("SELECT COUNT(*) FROM computers WHERE lab_room = ?", (lab_room,))
+        lab_exists = cursor.fetchone()[0]
+        
+        if lab_exists == 0:
+            flash(f"Lab {lab_room} not found in the system.", "danger")
+            return redirect(url_for('admin.computer_control', tab='requests'))
+        
+        # Find the computer in the lab
+        if computer_number:
+            cursor.execute(
+                "SELECT id, status, student_id FROM computers WHERE lab_room = ? AND pc_number = ?",
+                (lab_room, computer_number)
+            )
+            computer = cursor.fetchone()
+            
+            if not computer:
+                flash(f"Computer #{computer_number} not found in {lab_room}.", "danger")
+                return redirect(url_for('admin.computer_control', tab='requests'))
+                
+            if computer['status'] == 'in_use':
+                flash(f"Computer #{computer_number} in {lab_room} is already in use.", "danger")
+                return redirect(url_for('admin.computer_control', tab='requests'))
+                
+            computer_id = computer['id']
+        else:
+            # If no specific computer was requested, find an available one
+            cursor.execute(
+                "SELECT id, pc_number FROM computers WHERE lab_room = ? AND status = 'available' ORDER BY pc_number LIMIT 1",
+                (lab_room,)
+            )
+            available_computer = cursor.fetchone()
+            
+            if not available_computer:
+                flash(f"No computers available in {lab_room}.", "danger")
+                return redirect(url_for('admin.computer_control', tab='requests'))
+                
+            computer_id = available_computer['id']
+            computer_number = available_computer['pc_number']
+        
+        # Update the computer status to in_use
+        cursor.execute(
+            "UPDATE computers SET status = 'in_use', student_id = ? WHERE id = ?",
+            (student_id, computer_id)
+        )
+        
+        # Update the reservation status to approved
+        cursor.execute(
+            "UPDATE computer_reservation_requests SET status = 'approved', computer_number = ? WHERE id = ?",
+            (computer_number, request_id)
+        )
+        
+        # Create a sit-in record for the student
+        student_name = request_data['student_name']
+        purpose = request_data['purpose']
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        today = datetime.now().strftime('%Y-%m-%d')
+        
+        # Extract just the room number for consistency with sit_in form
+        lab_number = lab_room.replace("Room ", "") if lab_room.startswith("Room ") else lab_room
+        
+        cursor.execute("""
+            INSERT INTO sit_in_records (id_number, name, purpose, lab, login_time, date, computer_number)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (student_id, student_name, purpose, lab_number, now, today, computer_number))
+        
+        # Log the reservation approval
+        try:
+            log_reservation_action(
+                request_id, 
+                'approved', 
+                f"Reservation approved for computer #{computer_number} in {lab_room}"
+            )
+        except Exception as log_error:
+            print(f"Warning: Failed to log approval action: {str(log_error)}")
+            # Continue with approval even if logging fails
+            
+        # Direct insert into reservation_logs like in deny_reservation function
+        cursor.execute(
+            "INSERT INTO reservation_logs (request_id, student_id, lab_room, computer_number, action, status, reservation_time, purpose) "
+            "SELECT id, student_id, lab_room, computer_number, 'approved', 'approved', date || ' ' || time_in, purpose "
+            "FROM computer_reservation_requests WHERE id = ?",
+            (request_id,)
+        )
+            
+        conn.commit()
+        flash(f"Reservation for {student_name} approved successfully. Assigned to computer #{computer_number} in {lab_room}.", "success")
+    except Exception as e:
+        conn.rollback()
+        print(f"DEBUG: Error in approve_reservation: {str(e)}")
+        flash(f"Error approving reservation: {str(e)}", "danger")
+    finally:
+        conn.close()
+    return redirect(url_for('admin.computer_control', tab='requests'))
+
+@admin_bp.route('/deny_reservation/<int:request_id>', methods=['POST'])
+def deny_reservation(request_id):
+    if session.get('user_type') != 'admin':
+        flash("Admin access required.", "danger")
+        return redirect(url_for('auth.login'))
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        # Update the reservation status to denied
+        cursor.execute(
+            "UPDATE computer_reservation_requests SET status = 'denied' WHERE id = ?",
+            (request_id,)
+        )
+        # Optionally, log the denial in reservation_logs
+        cursor.execute(
+            "INSERT INTO reservation_logs (request_id, student_id, lab_room, computer_number, action, status, reservation_time, purpose) "
+            "SELECT id, student_id, lab_room, computer_number, 'denied', 'denied', date || ' ' || time_in, purpose "
+            "FROM computer_reservation_requests WHERE id = ?",
+            (request_id,)
+        )
+        conn.commit()
+        flash("Reservation request denied.", "success")
+    except Exception as e:
+        conn.rollback()
+        flash(f"Error denying reservation: {str(e)}", "danger")
+    finally:
+        conn.close()
+    return redirect(url_for('admin.computer_control', tab='requests'))

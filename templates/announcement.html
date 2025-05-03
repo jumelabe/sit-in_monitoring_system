@@ -1,200 +1,97 @@
 {% extends 'base.html' %}
 
-{% block title %}{% endblock %}
+{% block title %}Announcements - CCS Sit-In Monitoring System{% endblock %}
 
 {% block content %}
 <div class="dashboard-container">
     <div class="sidebar">
         <h1 class="dashboard-title">Announcement</h1>
-        <a href="{{ url_for('student.dashboard') }}" class="menu-btn">Dashboard</a>
-        <a href="{{ url_for('student.sit_in_history') }}" class="menu-btn">Sit-In History</a>
-        <a href="{{ url_for('student.reserve') }}" class="menu-btn">Reservation</a>
-        <a href="{{ url_for('student.announcements') }}" class="menu-btn active">Announcements</a>
-        <a href="{{ url_for('student.resources') }}" class="menu-btn">Resources</a>
-        <a href="{{ url_for('auth.logout') }}" class="menu-btn logout-btn">Logout</a>
+        {% if student is defined %}
+        <div class="profile">
+            {% if student.profile_picture is defined and student.profile_picture %}
+                <img src="{{ url_for('static', filename=student.profile_picture) }}" alt="Profile" class="profile-pic">
+            {% else %}
+                <img src="{{ url_for('static', filename='images/default-avatar.jpg') }}" alt="Profile" class="profile-pic">
+            {% endif %}
+            <span class="profile-name">{% if student.firstname is defined %}{{ student.firstname }}{% endif %} {% if student.lastname is defined %}{{ student.lastname }}{% endif %}</span>
+        </div>
+        {% endif %}
+        <div class="menu-container">
+            <a href="{{ url_for('student.dashboard') }}" class="menu-btn">
+                <i class="fas fa-tachometer-alt"></i> Dashboard
+            </a>
+            <a href="{{ url_for('student.sit_in_history') }}" class="menu-btn">
+                <i class="fas fa-history"></i> Sit-In History
+            </a>
+            <a href="{{ url_for('student.reserve') }}" class="menu-btn">
+                <i class="fas fa-calendar-check"></i> Reservation
+            </a>
+            <a href="{{ url_for('student.lab_schedules') }}" class="menu-btn">
+                <i class="fas fa-calendar-alt"></i> Lab Schedules
+            </a>
+            <a href="{{ url_for('student.announcements') }}" class="menu-btn active">
+                <i class="fas fa-bullhorn"></i> Announcement
+            </a>
+            <a href="{{ url_for('student.resources') }}" class="menu-btn">
+                <i class="fas fa-book"></i> Resources
+            </a>
+        </div>
+        <a href="{{ url_for('auth.logout') }}" class="menu-btn logout-btn">
+            <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
     </div>
 
-    <div class="announcement-container">
-        <div class="announcement-header-main">
-            <h2 class="section-title">
-                <i class="fas fa-bell"></i> Announcements
-            </h2>
-        </div>
-        <div class="announcement-list">
-            {% for announcement in announcements %}
-            <div class="announcement-card">
-                <div class="announcement-header">
-                    <h3 class="section-title">{{ announcement['title'] }}</h3>
-                    <span class="announcement-date">
-                        <i class="far fa-clock"></i>
-                        {{ announcement['created_at'][:10] }}
-                    </span>
-                </div>
-                <div class="announcement-content">
-                    {{ announcement['content'] }}
+    <div class="main-content">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-12">
+                    <h2 class="section-title">
+                        <i class="fas fa-bullhorn"></i> Announcements
+                    </h2>
                 </div>
             </div>
-            {% endfor %}
+            
+            <div class="row">
+                <div class="col-12">
+                    {% if announcements is defined and announcements %}
+                        {% for announcement in announcements %}
+                        <div class="card mb-3">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h3 class="card-title">{{ announcement.title|default(announcement['title']|default('Announcement')) }}</h3>
+                                <span class="announcement-date">
+                                    <i class="far fa-calendar-alt me-1"></i>
+                                    {% if announcement.created_at is defined %}
+                                        {{ announcement.created_at[:10] }}
+                                    {% elif announcement['created_at'] is defined %}
+                                        {{ announcement['created_at'][:10] }}
+                                    {% else %}
+                                        No date
+                                    {% endif %}
+                                </span>
+                            </div>
+                            <div class="card-body">
+                                {{ announcement.content|default(announcement['content']|default('No content available')) }}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="card">
+                            <div class="card-body text-center py-5">
+                                <i class="fas fa-info-circle fs-1 text-muted mb-3"></i>
+                                <p class="mb-0">No announcements available at this time.</p>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
 <style>
-.announcement-container {
-    flex: 1;
-    padding: 15px;
-    margin-left: 100px;
-    margin-right: 100px;
-    margin-top: 14px;
-    height: calc(100vh - 20px);
-    overflow-y: auto;
-    background: #ffffff;
-}
-
-.announcement-header-main {
-    margin-bottom: 15px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid #e0e0e0;
-}
-
-.announcement-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding: 0 5px;
-}
-
-.announcement-card {
-    background: #f8f9fa;
-    border-radius: 6px;
-    border: 1px solid #e9ecef;
-    margin-bottom: 5px;
-    transition: transform 0.2s ease;
-}
-
-.announcement-card:hover {
-    transform: translateX(5px);
-}
-
-.announcement-header {
-    padding: 12px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.announcement-title {
-    font-size: 1rem;
-    color: #1976d2;
-    margin: 0;
-    font-weight: 500;
-}
-
-.announcement-date {
-    font-size: 0.85rem;
-    color: #757575;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-}
-
-.announcement-content {
-    padding: 12px;
-    color: #424242;
-    line-height: 1.5;
-    font-size: 0.9rem;
-}
-
-.announcement-container::-webkit-scrollbar {
-    width: 6px;
-}
-
-.announcement-container::-webkit-scrollbar-track {
-    background: #f1f1f1;
-}
-
-.announcement-container::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 4px;
-}
-
-.announcement-container::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
-}
-
-@media screen and (max-width: 1024px) {
-    .announcement-container {
-        margin-left: 80px;
-        margin-right: 40px;
-    }
-}
-
-@media screen and (max-width: 768px) {
-    .dashboard-container {
-        flex-direction: column;
-    }
-
-    .sidebar {
-        width: 100%;
-        height: auto;
-        position: relative;
-        padding: 10px;
-    }
-
-    .announcement-container {
-        margin-left: 10px;
-        margin-right: 10px;
-        margin-top: 10px;
-        height: calc(100vh - 200px);
-    }
-
-    .dashboard-title {
-        font-size: 1.2rem;
-        margin-bottom: 10px;
-    }
-
-    .menu-btn {
-        display: inline-block;
-        width: auto;
-        padding: 8px 15px;
-        margin: 5px;
-    }
-
-    .announcement-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 5px;
-    }
-
     .announcement-date {
-        margin-top: 5px;
+        font-size: var(--small-size, 0.875rem);
+        color: var(--text-light, #777777);
     }
-
-    .announcement-title {
-        font-size: 0.95rem;
-    }
-
-    .announcement-content {
-        font-size: 0.85rem;
-        padding: 10px;
-    }
-}
-
-@media screen and (max-width: 480px) {
-    .announcement-container {
-        padding: 10px;
-        margin: 5px;
-    }
-
-    .announcement-card {
-        margin-bottom: 10px;
-    }
-
-    .menu-btn {
-        font-size: 0.9rem;
-        padding: 6px 12px;
-    }
-}
-
 </style>
 {% endblock %}

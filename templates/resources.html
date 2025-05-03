@@ -1,137 +1,91 @@
 {% extends "base.html" %}
-{% block title %}Lab Resources{% endblock %}
+{% block title %}Resources - CCS Sit-In Monitoring System{% endblock %}
 
 {% block content %}
 <div class="dashboard-container">
     <div class="sidebar">
         <h1 class="dashboard-title">Resources</h1>
-        <a href="{{ url_for('student.dashboard') }}" class="menu-btn">Dashboard</a>
-        <a href="{{ url_for('student.sit_in_history') }}" class="menu-btn">Sit-In History</a>
-        <a href="{{ url_for('student.reserve') }}" class="menu-btn">Reservation</a>
-        <a href="{{ url_for('student.announcements') }}" class="menu-btn">Announcement</a>
-        <a href="{{ url_for('student.resources') }}" class="menu-btn active">Resources</a>
-        <a href="{{ url_for('auth.logout') }}" class="menu-btn logout-btn">Logout</a>
-    </div>
-    <div class="container" style="max-width: 1200px; margin: 40px auto;">
-        <h1 class="section-title"><i class="fas fa-book"></i> RESOURCES</h1>
-        <div class="row" style="display: flex; flex-wrap: wrap; gap: 24px;">
-            {% for res in resources %}
-                <div class="resource-card improved-resource-card">
-                    <div class="resource-card-header">
-                        {{ res[1] }}
-                    </div>
-                    <hr class="resource-card-divider"/>
-                    <div class="resource-card-body">
-                        <div class="resource-card-desc">
-                            {{ res[2] }}
-                        </div>
-                        {% if res[3] %}
-                            <a href="{{ url_for('student.download_resource', filename=res[3]) }}"
-                               class="btn resource-card-btn theme-btn">
-                                Click to visit
-                            </a>
-                        {% elif res[4] %}
-                            <a href="{{ res[4] }}" target="_blank"
-                               class="btn resource-card-btn theme-btn">
-                                Click to visit
-                            </a>
-                        {% endif %}
-                    </div>
-                </div>
+        {% if student is defined %}
+        <div class="profile">
+            {% if student.profile_picture is defined and student.profile_picture %}
+                <img src="{{ url_for('static', filename=student.profile_picture) }}" alt="Profile" class="profile-pic">
             {% else %}
-                <div class="card text-muted" style="padding: 24px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
-                    No resources available yet.
+                <img src="{{ url_for('static', filename='images/default-avatar.jpg') }}" alt="Profile" class="profile-pic">
+            {% endif %}
+            <span class="profile-name">{% if student.firstname is defined %}{{ student.firstname }}{% endif %} {% if student.lastname is defined %}{{ student.lastname }}{% endif %}</span>
+        </div>
+        {% endif %}
+        <div class="menu-container">
+            <a href="{{ url_for('student.dashboard') }}" class="menu-btn">
+                <i class="fas fa-tachometer-alt"></i> Dashboard
+            </a>
+            <a href="{{ url_for('student.sit_in_history') }}" class="menu-btn">
+                <i class="fas fa-history"></i> Sit-In History
+            </a>
+            <a href="{{ url_for('student.reserve') }}" class="menu-btn">
+                <i class="fas fa-calendar-check"></i> Reservation
+            </a>
+            <a href="{{ url_for('student.lab_schedules') }}" class="menu-btn">
+                <i class="fas fa-calendar-alt"></i> Lab Schedules
+            </a>
+            <a href="{{ url_for('student.announcements') }}" class="menu-btn">
+                <i class="fas fa-bullhorn"></i> Announcement
+            </a>
+            <a href="{{ url_for('student.resources') }}" class="menu-btn active">
+                <i class="fas fa-book"></i> Resources
+            </a>
+        </div>
+        <a href="{{ url_for('auth.logout') }}" class="menu-btn logout-btn">
+            <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
+    </div>
+    <div class="main-content">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-12">
+                    <h2 class="section-title">
+                        <i class="fas fa-book"></i> Learning Resources
+                    </h2>
                 </div>
-            {% endfor %}
+            </div>
+            
+            <div class="row">
+                {% if resources is defined and resources %}
+                    {% for res in resources %}
+                    <div class="col-md-4 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header">
+                                <h3 class="card-title">{% if res[1] is defined %}{{ res[1] }}{% else %}Resource{% endif %}</h3>
+                            </div>
+                            <div class="card-body">
+                                <p class="mb-4">{% if res[2] is defined %}{{ res[2] }}{% else %}No description available{% endif %}</p>
+                                {% if res[3] is defined and res[3] %}
+                                    <a href="{{ url_for('student.download_resource', filename=res[3]) }}"
+                                       class="btn btn-primary">
+                                        <i class="fas fa-download me-1"></i> Download
+                                    </a>
+                                {% elif res[4] is defined and res[4] %}
+                                    <a href="{{ res[4] }}" target="_blank"
+                                       class="btn btn-primary">
+                                        <i class="fas fa-external-link-alt me-1"></i> Visit Link
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body text-center py-5">
+                                <i class="fas fa-info-circle fs-1 text-muted mb-3"></i>
+                                <p class="mb-0">No resources available yet.</p>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
         </div>
     </div>
 </div>
-<style>
-.improved-resource-card {
-    background: #fff;
-    border-radius: 16px;
-    box-shadow: 0 4px 18px rgba(60,60,60,0.10);
-    border: 1px solid #e5e7eb;
-    min-width: 280px;
-    max-width: 370px;
-    flex: 1 1 320px;
-    height: 220px;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    align-items: stretch;
-    transition: box-shadow 0.2s, transform 0.2s;
-    padding: 0;
-    margin: 0;
-    overflow: hidden;
-}
-.improved-resource-card:hover {
-    box-shadow: 0 8px 28px rgba(60,60,60,0.16);
-    transform: translateY(-4px) scale(1.02);
-    border-color: #b6d4fe;
-}
-.resource-card-header {
-    font-size: 1.18em;
-    font-weight: 700;
-    color: #1a237e;
-    background: #f5f7fa;
-    padding: 18px 20px 10px 20px;
-    border-top-left-radius: 16px;
-    border-top-right-radius: 16px;
-    text-align: left;
-    min-height: 48px;
-    display: flex;
-    align-items: center;
-}
-.resource-card-divider {
-    margin: 0 20px;
-    border: none;
-    border-top: 1px solid #e0e0e0;
-}
-.resource-card-body {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px 20px 20px 20px;
-}
-.resource-card-desc {
-    font-size: 1em;
-    color: #444;
-    margin-bottom: 18px;
-    width: 100%;
-    min-height: 24px;
-    text-align: left;
-    word-break: break-word;
-}
-.resource-card-btn {
-    font-weight: 600;
-    border-radius: 8px;
-    padding: 8px 22px;
-    font-size: 1em;
-    box-shadow: 0 2px 8px rgba(60,60,60,0.06);
-    transition: background 0.15s, color 0.15s;
-    border: none;
-}
-.theme-btn {
-    background: #4a3599;
-    color: #fff;
-}
-.theme-btn:hover, .theme-btn:focus {
-    background: #37266e;
-    color: #fff;
-}
-@media (max-width: 900px) {
-    .row {
-        flex-direction: column !important;
-        gap: 18px !important;
-    }
-    .improved-resource-card {
-        max-width: 100% !important;
-        min-width: 0 !important;
-    }
-}
-/* Removed redundant .section-title styles, now inherited from base.html */
-</style>
 {% endblock %}

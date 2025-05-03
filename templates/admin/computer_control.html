@@ -1,0 +1,2190 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="sidebar">
+        <h1 class="dashboard-title">Computer Control</h1>
+        <a href="{{ url_for('admin.admin_dashboard') }}" class="menu-btn">Dashboard</a>
+        <a href="{{ url_for('admin.student_list') }}" class="menu-btn">Student List</a>
+        <a href="{{ url_for('admin.current_sit_in') }}" class="menu-btn">Current Sit-in</a>
+        <a href="{{ url_for('admin.sit_in_records') }}" class="menu-btn">Sit-in Records</a>
+        <a href="{{ url_for('admin.computer_control') }}" class="menu-btn active">Computer Control</a>
+        <a href="{{ url_for('admin.reports') }}" class="menu-btn">Reports</a>
+        <a href="{{ url_for('admin.feedback_reports') }}" class="menu-btn">View Feedback</a>
+        <a href="{{ url_for('admin.leaderboards') }}" class="menu-btn">Leaderboards</a>
+        <a href="{{ url_for('admin.admin_resources') }}" class="menu-btn">Resources</a>
+        <a href="{{ url_for('admin.logout') }}" class="menu-btn logout-btn">Logout</a>
+    </div>
+
+    <div class="content">
+        <div class="container">
+            <!-- Tab Navigation -->
+            <ul class="nav nav-tabs" id="computerControlTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="computers-tab" data-bs-toggle="tab" data-bs-target="#computers" type="button" role="tab" aria-controls="computers" aria-selected="true">
+                        <i class="fas fa-desktop"></i> Computer Control
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="requests-tab" data-bs-toggle="tab" data-bs-target="#requests" type="button" role="tab" aria-controls="requests" aria-selected="false">
+                        <i class="fas fa-clipboard-list"></i> Reservation Requests <span class="badge bg-danger">{{ requests|length }}</span>
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="logs-tab" data-bs-toggle="tab" data-bs-target="#logs" type="button" role="tab" aria-controls="logs" aria-selected="false">
+                        <i class="fas fa-history"></i> Student Reservation Logs
+                    </button>
+                </li>
+            </ul>
+            
+            <!-- Tab Content -->
+            <div class="tab-content" id="computerControlTabsContent">
+                <!-- Computer Control Tab -->
+                <div class="tab-pane fade {% if active_tab == 'computers' or not active_tab %}show active{% endif %}" id="computers" role="tabpanel" aria-labelledby="computers-tab">
+                    <!-- Lab Statistics Section -->
+                    <div class="lab-stats-container">
+                        <h2 class="section-title">
+                            <i class="fas fa-desktop"></i> Lab Computer Status
+                        </h2>
+                        <div class="stats-cards">
+                            {% for stat in lab_stats %}
+                            <div class="lab-stat-card">
+                                <div class="lab-stat-header">
+                                    <h3>{{ stat.lab_room }}</h3>
+                                </div>
+                                <div class="lab-stat-body">
+                                    <div class="stat-item">
+                                        <span class="stat-label">Total PCs:</span>
+                                        <span class="stat-value">{{ stat.total }}</span>
+                                    </div>
+                                    <div class="stat-item available-stat">
+                                        <span class="stat-label">Available:</span>
+                                        <span class="stat-value">{{ stat.available }}</span>
+                                    </div>
+                                    <div class="stat-item in-use-stat">
+                                        <span class="stat-label">In Use:</span>
+                                        <span class="stat-value">{{ stat.in_use }}</span>
+                                    </div>
+                                </div>
+                                <div class="lab-stat-footer">
+                                    <a href="{{ url_for('admin.computer_control', lab=stat.lab_room) }}#computers" class="btn btn-primary btn-sm">
+                                        View Computers
+                                    </a>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Lab Computer Grid Section -->
+                    {% if selected_lab %}
+                    <div class="lab-computers-container">
+                        <div class="lab-header">
+                            <h2 class="section-title">
+                                <i class="fas fa-desktop"></i>{{ selected_lab }} Computers
+                            </h2>
+                            <div class="lab-actions">
+                                <div class="dropdown">
+                                    
+                                    <ul class="dropdown-menu" aria-labelledby="labDropdown">
+                                        {% for lab in lab_rooms %}
+                                        <li>
+                                            <a class="dropdown-item {% if lab == selected_lab %}active{% endif %}" href="{{ url_for('admin.computer_control', lab=lab) }}#computers">
+                                                 {{ lab }}
+                                            </a>
+                                        </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                                <button id="selectAllBtn" class="btn btn-outline-secondary ms-2">
+                                    <i class="fas fa-check-square"></i> Select All <span id="selectionCount" class="selection-count">0</span>
+                                </button>
+                                
+                                <form id="bulkActionForm" action="{{ url_for('admin.bulk_update_computer_status') }}" method="POST" class="d-inline ms-2">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="status" value="available">
+                                    <div id="bulkActionComputerIds"></div>
+                                    <button type="button" id="bulkAvailableBtn" class="btn btn-success" disabled onclick="submitBulkAction()">
+                                        <i class="fas fa-check-circle"></i> Mark Selected As Available
+                                    </button>
+                                </form>
+                                
+                                <form id="bulkInUseClassForm" action="{{ url_for('admin.bulk_update_computer_status') }}" method="POST" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="status" value="in_use">
+                                    <input type="hidden" name="usage_type" value="class">
+                                    <div id="bulkInUseClassComputerIds"></div>
+                                </form>
+                                
+                                <button type="button" id="bulkInUseBtn" class="btn btn-danger ms-2" disabled onclick="handleBulkInUse()">
+                                    <i class="fas fa-user"></i> Mark Selected In Use
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="computer-grid">
+                            {% for computer in computers %}
+                            <div class="computer-card {{ computer.status }}" id="computer-{{ computer.id }}">
+                                <div class="computer-header">
+                                    <div class="d-flex align-items-center">
+                                        <input type="checkbox" class="computer-checkbox me-2" data-computer-id="{{ computer.id }}">
+                                        <span class="pc-number">PC {{ computer.pc_number }}</span>
+                                    </div>
+                                    <span class="status-badge 
+                                        {% if computer.status == 'available' %}badge bg-success{% endif %}
+                                        {% if computer.status == 'in_use' %}badge bg-danger{% endif %}
+                                        {% if computer.status == 'maintenance' %}badge bg-warning{% endif %}
+                                    ">
+                                        {{ computer.status|replace('_', ' ')|title }}
+                                    </span>
+                                </div>
+                                <div class="computer-body">
+                                    <i class="fas fa-desktop computer-icon"></i>
+                                    {% if computer.student_id %}
+                                    <div class="student-info">
+                                        <span>User: {{ computer.student_id }}</span>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <div class="computer-footer">
+                                    <div class="status-btn-container">
+                                        <button type="button" class="status-btn available w-100 mb-1" data-computer-id="{{ computer.id }}" onclick="updateComputerStatus(this, 'available')">
+                                            <i class="fas fa-check-circle"></i> Available
+                                        </button>
+                                        
+                                        <button type="button" class="status-btn in-use w-100 mb-1" data-bs-toggle="modal" data-bs-target="#assignStudentModal" onclick="setComputerForAssignment('{{ computer.id }}')">
+                                            <i class="fas fa-user"></i> Mark In Use
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="lab-selection-message">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> Please select a lab room from the statistics cards above to view and manage its computers.
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Reservation Requests Tab -->
+                <div class="tab-pane fade {% if active_tab == 'requests' %}show active{% endif %}" id="requests" role="tabpanel" aria-labelledby="requests-tab">
+                    <div class="card">
+                        <div class="card-header py-2">
+                            <h5 class="mb-0 fs-6">Pending Reservation Requests</h5>
+                        </div>
+                        <div class="card-body p-3">
+                            {% if requests %}
+                            <div class="reservation-requests-grid">
+                                {% for request in requests %}
+                                <div class="reservation-request-card">
+                                    <div class="request-header">
+                                        <h5>Reservation Request</h5>
+                                        <span class="badge bg-warning">Pending</span>
+                                    </div>
+                                    <div class="request-body">
+                                        <div class="request-field">
+                                            <span class="field-label"><i class="fas fa-id-card"></i> ID Number:</span>
+                                            <span class="field-value">{{ request.student_id }}</span>
+                                        </div>
+                                        <div class="request-field">
+                                            <span class="field-label"><i class="fas fa-calendar-alt"></i> Reservation Date:</span>
+                                            <span class="field-value">{{ request.date }}</span>
+                                        </div>
+                                        <div class="request-field">
+                                            <span class="field-label"><i class="fas fa-clock"></i> Reservation Time:</span>
+                                            <span class="field-value">{{ request.time_in }}</span>
+                                        </div>
+                                        <div class="request-field">
+                                            <span class="field-label"><i class="fas fa-building"></i> Laboratory:</span>
+                                            <span class="field-value">{{ request.lab_room }}</span>
+                                        </div>
+                                        <div class="request-field">
+                                            <span class="field-label"><i class="fas fa-desktop"></i> Computer Number:</span>
+                                            <span class="field-value">
+                                                {% if request.computer_number %}
+                                                PC #{{ request.computer_number }}
+                                                {% else %}
+                                                <small class="text-muted">Auto-assign</small>
+                                                {% endif %}
+                                            </span>
+                                        </div>
+                                        <div class="request-field">
+                                            <span class="field-label"><i class="fas fa-tasks"></i> Purpose:</span>
+                                            <span class="field-value">{{ request.purpose }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="request-actions">
+                                        <form action="{{ url_for('admin.approve_reservation', request_id=request.id) }}" method="POST" class="d-inline">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-success">
+                                                <i class="fas fa-check me-1"></i> Approve
+                                            </button>
+                                        </form>
+                                        <form action="{{ url_for('admin.deny_reservation', request_id=request.id) }}" method="POST" class="d-inline">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-danger">
+                                                <i class="fas fa-times me-1"></i> Deny
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <div class="no-requests text-center">
+                                <i class="fas fa-clipboard-check fa-2x mb-2"></i>
+                                <h6>No pending requests</h6>
+                                <p class="text-muted small">When students submit reservation requests, they'll appear here.</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Student Reservation Logs Tab -->
+                <div class="tab-pane fade {% if active_tab == 'logs' %}show active{% endif %}" id="logs" role="tabpanel" aria-labelledby="logs-tab">
+                    <div class="card">
+                        <div class="card-header py-2 d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0 fs-6">Student Reservation Activity</h5>
+                            <span class="badge bg-info">{{ logs|selectattr('action', 'in', ['approved', 'denied'])|list|length }} records</span>
+                        </div>
+                        <div class="card-body p-2">
+                            <div class="student-logs-container">
+                                {% set filtered_logs = logs|selectattr('action', 'in', ['approved', 'denied'])|list %}
+                                {% if filtered_logs %}
+                                    <div class="reservation-logs-container">
+                                        {% for log in filtered_logs %}
+                                        <div class="reservation-request-card">
+                                            <div class="request-header" style="background: linear-gradient(135deg, #4a3599 0%, #6a5acd 100%);">
+                                                <h5>Reservation Log</h5>
+                                                {% if log.action == 'approved' %}
+                                                    <span class="badge bg-success">Approved</span>
+                                                {% elif log.action == 'denied' %}
+                                                    <span class="badge bg-danger">Denied</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="request-body">
+                                                <div class="request-field">
+                                                    <span class="field-label"><i class="fas fa-id-card"></i> ID Number:</span>
+                                                    <span class="field-value">{{ log.student_id }}</span>
+                                                </div>
+                                                <div class="request-field">
+                                                    <span class="field-label"><i class="fas fa-calendar-alt"></i> Reservation Date:</span>
+                                                    <span class="field-value">
+                                                        {% set reservation_parts = log.reservation_time.split(' ') %}
+                                                        {% if reservation_parts|length > 1 %}
+                                                            {{ reservation_parts[0] }}
+                                                        {% else %}
+                                                            {{ log.reservation_time }}
+                                                        {% endif %}
+                                                    </span>
+                                                </div>
+                                                <div class="request-field">
+                                                    <span class="field-label"><i class="fas fa-clock"></i> Reservation Time:</span>
+                                                    <span class="field-value">
+                                                        {% if reservation_parts|length > 1 %}
+                                                            {{ reservation_parts[1] }}
+                                                        {% else %}
+                                                            —
+                                                        {% endif %}
+                                                    </span>
+                                                </div>
+                                                <div class="request-field">
+                                                    <span class="field-label"><i class="fas fa-building"></i> Laboratory:</span>
+                                                    <span class="field-value">{{ log.lab_room }}</span>
+                                                </div>
+                                                <div class="request-field">
+                                                    <span class="field-label"><i class="fas fa-desktop"></i> Computer Number:</span>
+                                                    <span class="field-value">
+                                                        {% if log.computer_number and log.computer_number != 'N/A' %}
+                                                            PC #{{ log.computer_number }}
+                                                        {% else %}
+                                                            —
+                                                        {% endif %}
+                                                    </span>
+                                                </div>
+                                                <div class="request-field">
+                                                    <span class="field-label"><i class="fas fa-tasks"></i> Purpose:</span>
+                                                    <span class="field-value">{{ log.purpose }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <div class="text-center py-4">
+                                        <i class="fas fa-history fa-2x mb-2 text-muted"></i>
+                                        <h6>No reservation logs yet</h6>
+                                        <p class="text-muted small">Logs will appear here when students' reservations are approved or denied.</p>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add status notification div -->
+<div id="statusNotification" class="position-fixed top-0 end-0 p-3" style="z-index: 9999;"></div>
+
+<!-- Assign Student Modal -->
+<div class="modal fade" id="assignStudentModal" tabindex="-1" aria-labelledby="assignStudentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="assignStudentModalLabel">Assign Student to Computer</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('admin.update_computer_status_route') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="computer_id" id="modal-computer-id">
+                <input type="hidden" name="status" value="in_use">
+                
+                <div class="modal-body">
+                    <div class="assign-student-container text-center">
+                        <div class="computer-icon-container mb-4">
+                            <i class="fas fa-desktop computer-icon-large"></i>
+                            <div class="arrow-right"><i class="fas fa-arrow-right"></i></div>
+                            <i class="fas fa-user-graduate student-icon-large"></i>
+                        </div>
+                        
+                        <div class="assignment-info mb-4">
+                            <p class="assignment-description">
+                                Assign a computer to a student with an active sit-in session.<br>
+                                This will mark the computer as being used by this student.
+                            </p>
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle"></i> The student must have an active sit-in session. Students can start a session from the student portal or admins can start one from the Current Sit-in page.
+                            </div>
+                            <div id="assignment-error" class="alert alert-danger d-none"></div>
+                            <div id="assignment-success" class="alert alert-success d-none"></div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="student-id" class="form-label">Student ID</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-id-card"></i></span>
+                                <input type="text" class="form-control" id="student-id" name="student_id" placeholder="Enter valid student ID" required>
+                            </div>
+                            <small class="form-text text-muted">Enter the ID of a student who already has an active sit-in session.</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-cancel" data-bs-dismiss="modal">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                    <button type="submit" class="btn btn-assign">
+                        <i class="fas fa-check"></i> Assign Student
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Assign Student Modal (for individual sit-ins only) -->
+<div class="modal fade" id="bulkAssignStudentModal" tabindex="-1" aria-labelledby="bulkAssignStudentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="bulkAssignStudentModalLabel">Assign Student to Computers</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="bulkAssignForm" action="{{ url_for('admin.bulk_update_computer_status') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="status" value="in_use">
+                <input type="hidden" name="usage_type" value="individual">
+                <div id="bulkAssignComputerIds"></div>
+                
+                <div class="modal-body">
+                    <div class="assign-student-container">
+                        <div class="mb-4">
+                            <div class="alert alert-info mb-4">
+                                <i class="fas fa-info-circle"></i> Assign these computers to a student with an active sit-in session.
+                            </div>
+                            
+                            <label for="bulk-student-id" class="form-label">Student ID</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-id-card"></i></span>
+                                <input type="text" class="form-control" id="bulk-student-id" name="student_id" placeholder="Enter valid student ID" required>
+                            </div>
+                            <small class="form-text text-muted">Enter the ID of a student who already has an active sit-in session.</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-cancel" data-bs-dismiss="modal">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                    <button type="submit" class="btn btn-assign">
+                        <i class="fas fa-check"></i> Assign Student
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.lab-stats-container {
+    margin-bottom: 30px;
+}
+
+.stats-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.lab-stat-card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.lab-stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+}
+
+.lab-stat-header {
+    background: linear-gradient(135deg, #4a3599 0%, #6a5acd 100%);
+    color: white;
+    padding: 15px;
+    text-align: center;
+}
+
+.lab-stat-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.lab-stat-body {
+    padding: 15px;
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    padding: 8px;
+    border-radius: 6px;
+    background: #f8f9fa;
+}
+
+.available-stat {
+    background: rgba(40, 167, 69, 0.1);
+}
+
+.in-use-stat {
+    background: rgba(220, 53, 69, 0.1);
+}
+
+.maintenance-stat {
+    background: rgba(255, 193, 7, 0.1);
+}
+
+.stat-label {
+    font-weight: 500;
+    color: #495057;
+}
+
+.stat-value {
+    font-weight: 600;
+    color: #212529;
+}
+
+.lab-stat-footer {
+    padding: 15px;
+    text-align: center;
+    border-top: 1px solid #e9ecef;
+}
+
+.lab-computers-container {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    padding: 20px;
+    margin-bottom: 30px;
+}
+
+.lab-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.lab-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.computer-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 20px;
+}
+
+.computer-card {
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+    position: relative;
+}
+
+.computer-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+    z-index: 2;
+}
+
+.computer-card.available {
+    border-color: #28a745;
+    background-color: rgba(40, 167, 69, 0.05);
+}
+
+.computer-card.in_use {
+    border-color: #dc3545;
+    background-color: rgba(220, 53, 69, 0.05);
+}
+
+.computer-card.maintenance {
+    border-color: #ffc107;
+    background-color: rgba(255, 193, 7, 0.05);
+}
+
+.computer-card.selected {
+    background-color: rgba(74, 53, 153, 0.1);
+    border-color: #4a3599;
+    box-shadow: 0 0 15px rgba(74, 53, 153, 0.3);
+}
+
+.computer-checkbox {
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
+    accent-color: #4a3599;
+}
+
+.computer-checkbox:checked + .pc-number {
+    font-weight: bold;
+    color: #4a3599;
+}
+
+.computer-header {
+    padding: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.pc-number {
+    font-weight: 600;
+    color: #495057;
+    transition: color 0.2s ease;
+}
+
+.status-badge {
+    font-size: 0.75rem;
+    padding: 3px 8px;
+    font-weight: 500;
+    border-radius: 20px;
+}
+
+.computer-body {
+    padding: 20px;
+    text-align: center;
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    transition: background-color 0.3s ease;
+}
+
+.computer-icon {
+    font-size: 2.75rem;
+    margin-bottom: 15px;
+    color: #4a3599;
+    transition: all 0.3s ease;
+}
+
+.computer-card.available .computer-icon {
+    color: #28a745;
+}
+
+.computer-card.in_use .computer-icon {
+    color: #dc3545;
+}
+
+.computer-card.maintenance .computer-icon {
+    color: #ffc107;
+}
+
+.student-info {
+    font-size: 0.9rem;
+    color: #6c757d;
+    margin-top: 10px;
+    background: #f8f9fa;
+    padding: 5px 8px;
+    border-radius: 4px;
+    width: 100%;
+    word-break: break-word;
+}
+
+.computer-footer {
+    padding: 12px;
+    text-align: center;
+    border-top: 1px solid #e9ecef;
+    background: #f8f9fa;
+    position: relative;
+}
+
+.computer-footer .btn-group {
+    width: 100%;
+    position: static;
+}
+
+.dropdown-menu {
+    position: absolute;
+    display: none;
+    z-index: 9999 !important;
+    min-width: 10rem;
+    padding: 0.5rem 0;
+    margin: 0.125rem 0 0;
+    font-size: 1rem;
+    text-align: left;
+    list-style: none;
+    background-color: #fff;
+    background-clip: padding-box;
+    border: 1px solid rgba(0,0,0,.15);
+    border-radius: 0.25rem;
+}
+
+.dropdown-menu.show {
+    display: block !important;
+    top: auto !important;
+    bottom: 95% !important;
+}
+
+.status-btn-container {
+    position: relative;
+    z-index: 30;
+    pointer-events: auto;
+}
+
+.status-btn {
+    position: relative;
+    display: block;
+    width: 100%;
+    padding: 8px 20px;
+    margin: 5px 0;
+    background: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 5px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s;
+    z-index: 40 !important;
+    pointer-events: auto !important;
+}
+
+.status-btn:hover {
+    background-color: #f8f9fa;
+    transform: translateY(-2px);
+}
+
+.status-btn.available {
+    color: #28a745;
+    border-color: #28a745;
+}
+
+.status-btn.available:hover {
+    background-color: rgba(40, 167, 69, 0.1);
+}
+
+.status-btn.in-use {
+    color: #dc3545;
+    border-color: #dc3545;
+}
+
+.status-btn.in-use:hover {
+    background-color: rgba(220, 53, 69, 0.1);
+}
+
+.status-btn.maintenance {
+    color: #ffc107;
+    border-color: #ffc107;
+}
+
+.status-btn.maintenance:hover {
+    background-color: rgba(255, 193, 7, 0.1);
+}
+
+.lab-selection-message {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px;
+    padding: 2rem;
+    background: #f8f9fa;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.lab-selection-message .alert {
+    max-width: 500px;
+    text-align: center;
+    margin: 0;
+}
+
+/* Action buttons in the lab header */
+.lab-actions .btn {
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.lab-actions .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.lab-actions .btn-danger {
+    background: #dc3545;
+    border-color: #dc3545;
+}
+
+.lab-actions .btn-danger:hover {
+    background: #c82333;
+    border-color: #bd2130;
+}
+
+/* Improved dropdown styling */
+.dropdown-menu {
+    border: none;
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    padding: 8px;
+}
+
+.dropdown-item {
+    border-radius: 4px;
+    padding: 8px 12px;
+    transition: all 0.2s ease;
+}
+
+.dropdown-item:hover, .dropdown-item:focus {
+    background-color: rgba(74, 53, 153, 0.1);
+    color: #4a3599;
+}
+
+.dropdown-item.active {
+    background-color: #4a3599;
+    color: white;
+}
+
+.dropdown-item i {
+    margin-right: 8px;
+    width: 16px;
+    text-align: center;
+}
+
+/* Responsive adjustments */
+@media (max-width: 992px) {
+    .lab-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .lab-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+    
+    .computer-grid {
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .computer-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 15px;
+    }
+    
+    .lab-actions {
+        flex-wrap: wrap;
+    }
+    
+    .lab-actions .btn, .lab-actions .dropdown {
+        width: 100%;
+        margin-bottom: 8px;
+    }
+}
+
+/* Bulk action button styles */
+#bulkActionDropdown {
+    background-color: #4a3599;
+    color: white;
+    border-color: #4a3599;
+}
+
+#bulkActionDropdown:not(:disabled):hover {
+    background-color: #3a2889;
+    border-color: #3a2889;
+}
+
+#bulkActionDropdown:disabled {
+    background-color: #6c757d;
+    border-color: #6c757d;
+    opacity: 0.65;
+}
+
+#selectAllBtn {
+    background-color: #f8f9fa;
+    color: #212529;
+    border-color: #dee2e6;
+}
+
+#selectAllBtn:hover {
+    background-color: #e9ecef;
+}
+
+#selectAllBtn.btn-secondary {
+    background-color: #4a3599;
+    color: white;
+    border-color: #4a3599;
+}
+
+/* Modal enhancements */
+.custom-modal {
+    z-index: 1060 !important;
+}
+
+.modal-backdrop {
+    z-index: 1050 !important;
+}
+
+.modal-content {
+    pointer-events: auto !important;
+    position: relative;
+    z-index: 1070 !important;
+}
+
+.modal-header {
+    background: linear-gradient(135deg, #4a3599 0%, #6a5acd 100%);
+    color: white;
+    padding: 15px 20px;
+    border-bottom: none;
+}
+
+.modal-title {
+    font-weight: 600;
+    font-size: 1.25rem;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.modal-footer {
+    background: #f8f9fa;
+    border-top: 1px solid #eee;
+    padding: 15px 20px;
+}
+
+.btn-close {
+    color: white;
+    filter: brightness(0) invert(1);
+    opacity: 1;
+}
+
+.btn-close:hover {
+    opacity: 0.75;
+}
+
+.modal-dialog {
+    pointer-events: auto !important;
+}
+
+/* Ensure modal inputs are clickable */
+.modal-body input, 
+.modal-body label,
+.modal-body .form-check-input, 
+.modal-body .form-check-label {
+    position: relative;
+    z-index: 1080 !important;
+    pointer-events: auto !important;
+}
+
+.modal-footer button {
+    position: relative;
+    z-index: 1080 !important;
+    pointer-events: auto !important;
+}
+
+/* Button styling */
+.modal .btn {
+    padding: 8px 20px;
+    border-radius: 6px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.modal .btn-primary {
+    background: #4a3599;
+    border-color: #4a3599;
+}
+
+.modal .btn-primary:hover {
+    background: #37277a;
+    border-color: #37277a;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.modal .btn-secondary {
+    background: #eaecf0;
+    border-color: #eaecf0;
+    color: #333;
+}
+
+.modal .btn-secondary:hover {
+    background: #d8dde6;
+    border-color: #d8dde6;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+}
+
+/* New reservation request and logs CSS */
+.card {
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+    border: none;
+    overflow: hidden;
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+    padding: 15px 20px;
+}
+
+.table {
+    margin-bottom: 0;
+}
+
+.table th {
+    font-weight: 600;
+    color: #495057;
+    border-bottom-width: 1px;
+    background-color: #f8f9fa;
+}
+
+.table th, .table td {
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+    vertical-align: middle;
+}
+
+.badge {
+    font-size: 0.85em;
+    padding: 0.5em 0.75em;
+    font-weight: 500;
+}
+
+.no-requests, .no-logs {
+    text-align: center;
+    padding: 40px 0;
+    color: #6c757d;
+}
+
+.action-btns {
+    display: flex;
+    gap: 5px;
+}
+
+/* Filter form */
+.filter-form {
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.form-select, .form-control {
+    border-radius: 6px;
+    border: 1px solid #ced4da;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.9rem;
+    transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.form-select:focus, .form-control:focus {
+    border-color: #4a3599;
+    box-shadow: 0 0 0 0.25rem rgba(74, 53, 153, 0.25);
+}
+
+.form-label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+    color: #495057;
+}
+
+/* Status badges */
+.badge-approved {
+    background-color: #28a745;
+}
+
+.badge-pending {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.badge-denied {
+    background-color: #dc3545;
+}
+
+/* Action badges */
+.badge-request_created {
+    background-color: #17a2b8;
+}
+
+.badge-request_approved {
+    background-color: #28a745;
+}
+
+.badge-request_denied {
+    background-color: #dc3545;
+}
+
+.badge-checkout {
+    background-color: #6f42c1;
+}
+
+.badge-checkin {
+    background-color: #fd7e14;
+}
+
+/* Nav tabs styles */
+.nav-tabs {
+    border-bottom: 2px solid #e9ecef;
+    margin-bottom: 20px;
+}
+
+.nav-tabs .nav-link {
+    border: none;
+    font-size: 1rem;
+    font-weight: 500;
+    color: #495057;
+    padding: 0.75rem 1.25rem;
+    border-radius: 0;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.nav-tabs .nav-link:hover {
+    color: #4a3599;
+    background-color: rgba(74, 53, 153, 0.05);
+}
+
+.nav-tabs .nav-link.active {
+    color: #4a3599;
+    font-weight: 600;
+    background-color: transparent;
+}
+
+.nav-tabs .nav-link.active::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background-color: #4a3599;
+}
+
+.nav-tabs .nav-link i {
+    margin-right: 8px;
+}
+
+.badge.bg-danger {
+    font-size: 0.75rem;
+    padding: 0.2em 0.6em;
+    margin-left: 5px;
+}
+
+.tab-content {
+    padding: 0;
+}
+
+/* Count indicator style */
+.selection-count {
+    display: inline-block;
+    margin-left: 8px;
+    background-color: rgba(74, 53, 153, 0.1);
+    color: #4a3599;
+    font-size: 0.75rem;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-weight: 600;
+}
+
+/* Additional fixes for modal issues */
+.modal-open {
+    overflow: hidden;
+    padding-right: 0 !important;
+}
+
+.modal {
+    display: none;
+    overflow: hidden;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1060 !important;
+    -webkit-overflow-scrolling: touch;
+    outline: 0;
+}
+
+.modal.fade .modal-dialog {
+    -webkit-transform: translate(0, -25%);
+    -ms-transform: translate(0, -25%);
+    -o-transform: translate(0, -25%);
+    transform: translate(0, -25%);
+    -webkit-transition: -webkit-transform 0.3s ease-out;
+    -moz-transition: -moz-transform 0.3s ease-out;
+    -o-transition: -o-transform 0.3s ease-out;
+    transition: transform 0.3s ease-out;
+}
+
+.modal.show .modal-dialog {
+    -webkit-transform: translate(0, 0);
+    -ms-transform: translate(0, 0);
+    -o-transform: translate(0, 0);
+    transform: translate(0, 0);
+}
+
+.modal-open .modal {
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1050 !important;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+}
+
+.modal-backdrop.fade {
+    opacity: 0;
+}
+
+.modal-backdrop.show {
+    opacity: 0.5;
+}
+
+.fade {
+    opacity: 0;
+    transition: opacity .15s linear;
+}
+
+.fade.show {
+    opacity: 1;
+}
+
+/* Fix for modal being unclickable */
+.modal-dialog {
+    position: relative;
+    width: auto;
+    margin: 10px auto;
+    z-index: 1055 !important;
+    pointer-events: auto !important;
+}
+
+.modal-content {
+    position: relative;
+    background-color: #fff;
+    -webkit-background-clip: padding-box;
+    background-clip: padding-box;
+    border: 1px solid rgba(0, 0, 0, .2);
+    border-radius: .3rem;
+    outline: 0;
+    z-index: 1070 !important;
+    pointer-events: auto !important;
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+}
+
+@media (min-width: 576px) {
+    .modal-dialog {
+        max-width: 500px;
+        margin: 30px auto;
+    }
+}
+
+/* Fix for inputs in the modal */
+#bulkAssignStudentModal input[type="radio"],
+#bulkAssignStudentModal label,
+#bulkAssignStudentModal input[type="text"],
+#bulkAssignStudentModal button {
+    position: relative;
+    z-index: 1080 !important;
+    pointer-events: auto !important;
+}
+
+/* Reservation Request Card Styles */
+.reservation-requests-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+}
+
+.reservation-request-card {
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    background-color: #fff;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.reservation-request-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+}
+
+.request-header {
+    background: linear-gradient(135deg, #4a3599 0%, #6a5acd 100%);
+    color: white;
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.request-header h5 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.request-body {
+    padding: 15px;
+}
+
+.request-field {
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+}
+
+.field-label {
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 3px;
+    font-size: 0.9rem;
+}
+
+.field-label i {
+    width: 20px;
+    margin-right: 5px;
+    color: #4a3599;
+}
+
+.field-value {
+    color: #333;
+    font-size: 1.05rem;
+    padding: 3px 0;
+}
+
+.request-actions {
+    display: flex;
+    justify-content: space-between;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-top: 1px solid #e0e0e0;
+}
+
+.request-actions .btn {
+    flex: 1;
+    margin: 0 5px;
+    padding: 8px 15px;
+    font-weight: 500;
+}
+
+.request-actions .btn-success {
+    background-color: #28a745;
+    border-color: #28a745;
+}
+
+.request-actions .btn-success:hover {
+    background-color: #218838;
+    border-color: #1e7e34;
+}
+
+.request-actions .btn-danger {
+    background-color: #dc3545;
+    border-color: #dc3545;
+}
+
+.request-actions .btn-danger:hover {
+    background-color: #c82333;
+    border-color: #bd2130;
+}
+
+@media (max-width: 768px) {
+    .reservation-requests-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Additional styles for reservation logs */
+.reservation-logs-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 15px;
+    margin-top: 10px;
+}
+
+.reservation-log-card {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    background-color: #fff;
+    transition: transform 0.2s;
+}
+
+.reservation-log-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.log-header {
+    color: white;
+    padding: 10px 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.log-header i {
+    font-size: 1.1rem;
+}
+
+.timestamp {
+    opacity: 0.8;
+}
+
+.log-body {
+    padding: 15px;
+}
+
+.log-info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+
+.log-info-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.log-label {
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin-bottom: 3px;
+}
+
+.log-label i {
+    width: 16px;
+    margin-right: 5px;
+    color: #4a3599;
+}
+
+.log-value {
+    font-weight: 500;
+    color: #333;
+}
+
+.log-details {
+    background-color: #f8f9fa;
+    padding: 10px;
+    border-radius: 5px;
+    margin-top: 10px;
+}
+
+.log-details-text {
+    margin: 5px 0 0;
+    font-size: 0.9rem;
+    color: #555;
+}
+
+@media (max-width: 768px) {
+    .reservation-logs-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .log-info-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.student-logs-container {
+    margin-top: 10px;
+}
+
+.student-logs-container .table {
+    font-size: 0.9rem;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.student-logs-container .table thead th {
+    font-weight: 600;
+    color: #495057;
+    border-bottom-width: 1px;
+    background-color: #f8f9fa;
+}
+
+.student-logs-container .table tbody tr:hover {
+    background-color: rgba(74, 53, 153, 0.05);
+}
+
+.student-logs-container .badge {
+    font-size: 0.8rem;
+    font-weight: 500;
+    padding: 0.3em 0.6em;
+}
+
+/* Add these styles to your existing styles */
+.assign-student-container {
+    padding: 10px;
+}
+
+.computer-icon-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.computer-icon-large {
+    font-size: 3rem;
+    color: #6a5acd;
+    margin-right: 20px;
+}
+
+.student-icon-large {
+    font-size: 3rem;
+    color: #28a745;
+    margin-left: 20px;
+}
+
+.arrow-right {
+    color: #6c757d;
+    font-size: 1.5rem;
+    margin: 0 10px;
+}
+
+.assignment-description {
+    color: #495057;
+    font-size: 1rem;
+    line-height: 1.5;
+}
+
+.form-label {
+    font-weight: 500;
+    color: #495057;
+    text-align: left;
+    display: block;
+}
+
+.input-group-text {
+    background-color: #6a5acd;
+    color: white;
+    border-color: #6a5acd;
+}
+
+.form-control:focus {
+    border-color: #6a5acd;
+    box-shadow: 0 0 0 0.25rem rgba(106, 90, 205, 0.25);
+}
+
+.form-text {
+    text-align: left;
+    display: block;
+    margin-top: 8px;
+}
+
+.btn-assign {
+    background-color: #6a5acd;
+    color: white;
+    border: none;
+    padding: 8px 20px;
+    transition: all 0.2s;
+}
+
+.btn-assign:hover, .btn-assign:focus {
+    background-color: #5849b8;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(106, 90, 205, 0.3);
+}
+
+.btn-cancel {
+    background-color: #f8f9fa;
+    color: #495057;
+    border: 1px solid #ced4da;
+    padding: 8px 20px;
+    transition: all 0.2s;
+}
+
+.btn-cancel:hover, .btn-cancel:focus {
+    background-color: #e9ecef;
+    transform: translateY(-2px);
+}
+
+#assignment-error, #assignment-success {
+    padding: 10px 15px;
+    border-radius: 8px;
+    margin: 15px 0;
+    text-align: left;
+}
+
+/* Additional fixes for dropdown menus and buttons */
+.dropdown-menu {
+    z-index: 1080 !important;
+    position: absolute;
+}
+
+.dropdown-item {
+    cursor: pointer !important;
+    z-index: 1090 !important;
+    position: relative;
+    pointer-events: auto !important;
+}
+
+.computer-footer .dropdown {
+    position: relative;
+}
+
+.computer-footer .dropdown-menu {
+    min-width: 100%;
+    width: max-content;
+}
+
+/* Ensure status actions are clickable */
+.status-action {
+    z-index: 1100 !important;
+    position: relative;
+    pointer-events: auto !important;
+}
+
+/* Fix Bootstrap modal backdrop to not block elements */
+.modal-backdrop {
+    z-index: 1050 !important;
+}
+
+.modal {
+    z-index: 1060 !important;
+}
+
+/* Additional debugging border to highlight clickable elements */
+.dropdown-item:hover {
+    outline: 2px solid #6a5acd !important;
+}
+
+/* Make bulk actions dropdown always on top */
+.lab-actions {
+    position: relative;
+    z-index: 1000;
+}
+
+#bulkActionDropdown {
+    position: relative;
+    z-index: 1001;
+}
+
+/* Ensure dropdown menu is above other elements */
+.dropdown-menu {
+    z-index: 1002 !important;
+}
+
+.dropdown-item {
+    position: relative;
+    z-index: 1003 !important;
+    cursor: pointer;
+}
+
+/* Make .dropdown-menu.show visible on top of other elements */
+.dropdown-menu.show {
+    display: block !important;
+    z-index: 1100 !important;
+}
+
+/* Additional styles for usage type selection */
+.usage-type-selection {
+    text-align: left;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    padding: 15px;
+    background-color: #f8f9fa;
+}
+
+.form-check-input:checked {
+    background-color: #6a5acd;
+    border-color: #6a5acd;
+}
+
+.form-check-label {
+    font-weight: 500;
+    color: #495057;
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+// When the DOM is fully loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle "Mark In Use" button clicks to set the computer ID in the modal
+    document.querySelectorAll('.status-btn.in-use').forEach(button => {
+        button.addEventListener('click', function() {
+            const computerId = this.getAttribute('data-computer-id');
+            document.getElementById('modal-computer-id').value = computerId;
+        });
+    });
+    
+    // Handle checkbox selection for bulk actions
+    const computerCheckboxes = document.querySelectorAll('.computer-checkbox');
+    const bulkAvailableButton = document.getElementById('bulkAvailableBtn');
+    const bulkInUseButton = document.getElementById('bulkInUseBtn');
+    
+    computerCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const card = this.closest('.computer-card');
+            if (this.checked) {
+                card.classList.add('selected');
+            } else {
+                card.classList.remove('selected');
+            }
+            updateSelectionCount();
+        });
+    });
+    
+    // Handle select all button
+    const selectAllBtn = document.getElementById('selectAllBtn');
+    if (selectAllBtn) {
+        selectAllBtn.addEventListener('click', function() {
+            const checkboxes = document.querySelectorAll('.computer-checkbox');
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = !allChecked;
+                const card = checkbox.closest('.computer-card');
+                if (!allChecked) {
+                    card.classList.add('selected');
+                } else {
+                    card.classList.remove('selected');
+                }
+            });
+            
+            updateSelectionCount();
+            
+            // Update button text
+            if (!allChecked) {
+                this.innerHTML = '<i class="fas fa-square"></i> Deselect All <span id="selectionCount" class="selection-count">' + checkboxes.length + '</span>';
+                this.classList.replace('btn-outline-secondary', 'btn-secondary');
+            } else {
+                this.innerHTML = '<i class="fas fa-check-square"></i> Select All <span id="selectionCount" class="selection-count">0</span>';
+                this.classList.replace('btn-secondary', 'btn-outline-secondary');
+            }
+        });
+    }
+    
+    // Update selection count and enable/disable bulk action buttons
+    function updateSelectionCount() {
+        const checkedBoxes = document.querySelectorAll('.computer-checkbox:checked');
+        const selectionCount = document.getElementById('selectionCount');
+        const bulkAvailableBtn = document.getElementById('bulkAvailableBtn');
+        const bulkInUseBtn = document.getElementById('bulkInUseBtn');
+        
+        if (selectionCount) {
+            selectionCount.textContent = checkedBoxes.length;
+        }
+        
+        if (bulkAvailableBtn) {
+            bulkAvailableBtn.disabled = checkedBoxes.length === 0;
+        }
+        
+        if (bulkInUseBtn) {
+            bulkInUseBtn.disabled = checkedBoxes.length === 0;
+        }
+    }
+    
+    // Initially update count
+    updateSelectionCount();
+    
+    // Handle usage type radio buttons
+    const individualUseRadio = document.getElementById('individualUse');
+    const classUseRadio = document.getElementById('classUse');
+    const studentIdContainer = document.getElementById('studentIdContainer');
+    
+    if (individualUseRadio && classUseRadio && studentIdContainer) {
+        individualUseRadio.addEventListener('change', function() {
+            if (this.checked) {
+                studentIdContainer.style.display = 'block';
+            }
+        });
+        
+        classUseRadio.addEventListener('change', function() {
+            if (this.checked) {
+                studentIdContainer.style.display = 'none';
+            }
+        });
+    }
+});
+
+// Function to set computer for assignment in modal
+function setComputerForAssignment(computerId) {
+    document.getElementById('modal-computer-id').value = computerId;
+}
+
+// Function to update computer status without page refresh
+function updateComputerStatus(button, status) {
+    const computerId = button.getAttribute('data-computer-id');
+    const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+    
+    // Show loading indicator
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    button.disabled = true;
+    
+    fetch('{{ url_for("admin.update_computer_status_route") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: new URLSearchParams({
+            'csrf_token': csrfToken,
+            'computer_id': computerId,
+            'status': status
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update the UI to reflect the new status
+            const computerCard = document.getElementById('computer-' + computerId);
+            
+            // Remove previous status classes
+            computerCard.classList.remove('available', 'in_use', 'maintenance');
+            
+            // Add new status class
+            computerCard.classList.add(status);
+            
+            // Update status badge
+            const statusBadge = computerCard.querySelector('.status-badge');
+            statusBadge.className = 'status-badge badge';
+            
+            if (status === 'available') {
+                statusBadge.classList.add('bg-success');
+                statusBadge.textContent = 'Available';
+                
+                // Clear student info if any
+                const studentInfo = computerCard.querySelector('.student-info');
+                if (studentInfo) {
+                    studentInfo.remove();
+                }
+            } else if (status === 'in_use') {
+                statusBadge.classList.add('bg-danger');
+                statusBadge.textContent = 'In Use';
+            }
+            
+            // Show notification
+            showNotification('Success', 'Computer status updated successfully', 'success');
+        } else {
+            // Show error notification
+            showNotification('Error', data.message || 'Failed to update computer status', 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('Error', 'An unexpected error occurred', 'danger');
+    })
+    .finally(() => {
+        // Restore button text
+        if (status === 'available') {
+            button.innerHTML = '<i class="fas fa-check-circle"></i> Available';
+        } else {
+            button.innerHTML = '<i class="fas fa-user"></i> Mark In Use';
+        }
+        button.disabled = false;
+    });
+}
+
+// Function to submit bulk action without page refresh
+function submitBulkAction() {
+    const checkedBoxes = document.querySelectorAll('.computer-checkbox:checked');
+    if (checkedBoxes.length === 0) {
+        alert('Please select at least one computer');
+        return;
+    }
+    
+    const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+    const computerIds = Array.from(checkedBoxes).map(checkbox => checkbox.getAttribute('data-computer-id'));
+    
+    console.log('Submitting bulk action for computers:', computerIds);
+    
+    // Show loading indicator
+    const bulkAvailableBtn = document.getElementById('bulkAvailableBtn');
+    bulkAvailableBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    bulkAvailableBtn.disabled = true;
+    
+    // Create a simple direct form submit instead of AJAX
+    const tempForm = document.createElement('form');
+    tempForm.method = 'POST';
+    tempForm.action = '{{ url_for("admin.bulk_update_computer_status") }}';
+    tempForm.style.display = 'none';
+    
+    // Add CSRF token
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrf_token';
+    csrfInput.value = csrfToken;
+    tempForm.appendChild(csrfInput);
+    
+    // Add status
+    const statusInput = document.createElement('input');
+    statusInput.type = 'hidden';
+    statusInput.name = 'status';
+    statusInput.value = 'available';
+    tempForm.appendChild(statusInput);
+    
+    // Add computer IDs
+    computerIds.forEach(id => {
+        const idInput = document.createElement('input');
+        idInput.type = 'hidden';
+        idInput.name = 'computer_ids[]';
+        idInput.value = id;
+        tempForm.appendChild(idInput);
+    });
+    
+    // Add form to body and submit
+    document.body.appendChild(tempForm);
+    tempForm.submit();
+}
+
+// Function to handle the Mark In Use button click with AJAX
+function handleBulkInUse() {
+    const checkedBoxes = document.querySelectorAll('.computer-checkbox:checked');
+    if (checkedBoxes.length === 0) {
+        alert('Please select at least one computer');
+        return;
+    }
+    
+    const totalComputers = document.querySelectorAll('.computer-checkbox').length;
+    const computerIds = Array.from(checkedBoxes).map(checkbox => checkbox.getAttribute('data-computer-id'));
+    
+    console.log('Handling bulk in-use for computers:', computerIds);
+    
+    // If ALL computers are selected, treat as class use
+    if (checkedBoxes.length === totalComputers) {
+        console.log('All computers selected - treating as class use');
+        
+        // Create a simple direct form submit instead of AJAX
+        const tempForm = document.createElement('form');
+        tempForm.method = 'POST';
+        tempForm.action = '{{ url_for("admin.bulk_update_computer_status") }}';
+        tempForm.style.display = 'none';
+        
+        // Add CSRF token
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrf_token';
+        csrfInput.value = document.querySelector('input[name="csrf_token"]').value;
+        tempForm.appendChild(csrfInput);
+        
+        // Add status and usage type
+        const statusInput = document.createElement('input');
+        statusInput.type = 'hidden';
+        statusInput.name = 'status';
+        statusInput.value = 'in_use';
+        tempForm.appendChild(statusInput);
+        
+        const usageTypeInput = document.createElement('input');
+        usageTypeInput.type = 'hidden';
+        usageTypeInput.name = 'usage_type';
+        usageTypeInput.value = 'class';
+        tempForm.appendChild(usageTypeInput);
+        
+        // Add computer IDs
+        computerIds.forEach(id => {
+            const idInput = document.createElement('input');
+            idInput.type = 'hidden';
+            idInput.name = 'computer_ids[]';
+            idInput.value = id;
+            tempForm.appendChild(idInput);
+        });
+        
+        // Add form to body and submit
+        document.body.appendChild(tempForm);
+        tempForm.submit();
+    } else {
+        // For individual selections, show the modal as before
+        const container = document.getElementById('bulkAssignComputerIds');
+        container.innerHTML = '';
+        
+        checkedBoxes.forEach(checkbox => {
+            const computerId = checkbox.getAttribute('data-computer-id');
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'computer_ids[]';
+            input.value = computerId;
+            container.appendChild(input);
+        });
+        
+        // Open the modal
+        const modal = document.getElementById('bulkAssignStudentModal');
+        const bulkAssignModal = new bootstrap.Modal(modal);
+        bulkAssignModal.show();
+    }
+}
+
+// Function to display notifications
+function showNotification(title, message, type) {
+    const notification = document.createElement('div');
+    notification.className = `toast align-items-center text-white bg-${type} border-0`;
+    notification.setAttribute('role', 'alert');
+    notification.setAttribute('aria-live', 'assertive');
+    notification.setAttribute('aria-atomic', 'true');
+    
+    notification.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">
+                <strong>${title}:</strong> ${message}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    `;
+    
+    document.getElementById('statusNotification').appendChild(notification);
+    
+    const toast = new bootstrap.Toast(notification, {
+        animation: true,
+        autohide: true,
+        delay: 3000
+    });
+    
+    toast.show();
+    
+    // Remove the notification after it's hidden
+    notification.addEventListener('hidden.bs.toast', function() {
+        notification.remove();
+    });
+}
+
+// Modify the assign student form to use AJAX
+document.addEventListener('DOMContentLoaded', function() {
+    const assignStudentForm = document.querySelector('#assignStudentModal form');
+    if (assignStudentForm) {
+        assignStudentForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            
+            const formData = new FormData(assignStudentForm);
+            const computerId = formData.get('computer_id');
+            const studentId = formData.get('student_id');
+            
+            if (!studentId) {
+                alert('Please enter a student ID');
+                return;
+            }
+            
+            const submitBtn = assignStudentForm.querySelector('button[type="submit"]');
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+            submitBtn.disabled = true;
+            
+            fetch('{{ url_for("admin.update_computer_status_route") }}', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update UI
+                    const computerCard = document.getElementById('computer-' + computerId);
+                    
+                    // Remove previous status classes
+                    computerCard.classList.remove('available', 'in_use', 'maintenance');
+                    
+                    // Add in_use class
+                    computerCard.classList.add('in_use');
+                    
+                    // Update status badge
+                    const statusBadge = computerCard.querySelector('.status-badge');
+                    statusBadge.className = 'status-badge badge bg-danger';
+                    statusBadge.textContent = 'In Use';
+                    
+                    // Add student info if not already present
+                    const computerBody = computerCard.querySelector('.computer-body');
+                    let studentInfo = computerCard.querySelector('.student-info');
+                    
+                    if (!studentInfo) {
+                        studentInfo = document.createElement('div');
+                        studentInfo.className = 'student-info';
+                        computerBody.appendChild(studentInfo);
+                    }
+                    
+                    studentInfo.innerHTML = `<span>User: ${studentId}</span>`;
+                    
+                    // Close modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('assignStudentModal'));
+                    modal.hide();
+                    
+                    // Reset form
+                    assignStudentForm.reset();
+                    
+                    // Show notification
+                    showNotification('Success', 'Computer assigned to student successfully', 'success');
+                } else {
+                    // Show error notification
+                    showNotification('Error', data.message || 'Failed to assign computer to student', 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification('Error', 'An unexpected error occurred', 'danger');
+            })
+            .finally(() => {
+                // Restore button text
+                submitBtn.innerHTML = '<i class="fas fa-check"></i> Assign Student';
+                submitBtn.disabled = false;
+            });
+        });
+    }
+    
+    // Modify bulk assign form
+    const bulkAssignForm = document.getElementById('bulkAssignForm');
+    if (bulkAssignForm) {
+        bulkAssignForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            
+            const formData = new FormData(bulkAssignForm);
+            const submitBtn = bulkAssignForm.querySelector('button[type="submit"]');
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+            submitBtn.disabled = true;
+            
+            // Get computer IDs
+            const computerIds = [];
+            document.querySelectorAll('#bulkAssignComputerIds input').forEach(input => {
+                computerIds.push(input.value);
+            });
+            
+            fetch('{{ url_for("admin.bulk_update_computer_status") }}', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update UI for each computer
+                    computerIds.forEach(computerId => {
+                        const computerCard = document.getElementById('computer-' + computerId);
+                        
+                        // Remove previous status classes
+                        computerCard.classList.remove('available', 'in_use', 'maintenance');
+                        
+                        // Add in_use class
+                        computerCard.classList.add('in_use');
+                        
+                        // Update status badge
+                        const statusBadge = computerCard.querySelector('.status-badge');
+                        statusBadge.className = 'status-badge badge bg-danger';
+                        statusBadge.textContent = 'In Use';
+                        
+                        // Add student info
+                        const computerBody = computerCard.querySelector('.computer-body');
+                        let studentInfo = computerCard.querySelector('.student-info');
+                        
+                        if (!studentInfo) {
+                            studentInfo = document.createElement('div');
+                            studentInfo.className = 'student-info';
+                            computerBody.appendChild(studentInfo);
+                        }
+                        
+                        studentInfo.innerHTML = `<span>User: ${formData.get('student_id')}</span>`;
+                        
+                        // Uncheck the checkbox
+                        const checkbox = computerCard.querySelector('.computer-checkbox');
+                        checkbox.checked = false;
+                        computerCard.classList.remove('selected');
+                    });
+                    
+                    // Update selection count
+                    updateSelectionCount();
+                    
+                    // Close modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('bulkAssignStudentModal'));
+                    modal.hide();
+                    
+                    // Reset form
+                    bulkAssignForm.reset();
+                    
+                    // Show notification
+                    showNotification('Success', 'Computers assigned to student successfully', 'success');
+                } else {
+                    // Show error notification
+                    showNotification('Error', data.message || 'Failed to assign computers to student', 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification('Error', 'An unexpected error occurred', 'danger');
+            })
+            .finally(() => {
+                // Restore button text
+                submitBtn.innerHTML = '<i class="fas fa-check"></i> Assign Student';
+                submitBtn.disabled = false;
+            });
+        });
+    }
+});
+</script>
+{% endblock %}

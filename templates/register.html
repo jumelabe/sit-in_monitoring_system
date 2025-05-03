@@ -1,34 +1,19 @@
 {% extends "base.html" %}
 
-{% block title %}{% endblock %}
+{% block title %}Register - CCS Sit-In Monitoring System{% endblock %}
 
 {% block content %}
-<div class="register-container">
-  <div class="register-form">
-    <h2>Create Account</h2>
+<div class="register-bg">
+  <div class="register-card">
+    <h2 class="register-title">Create Account</h2>
     <form method="POST" action="{{ url_for('auth.register') }}" onsubmit="return validateForm()">
       {{ form.csrf_token }}
-      <div class="form-grid">
-        <!-- Left Column -->
-        <div class="form-column">
-          <input type="text" name="student_id" id="student_id" class="form-control" placeholder="Student ID" 
+      <div class="register-grid">
+        <div class="form-group">
+          <input type="text" name="student_id" id="student_id" class="form-control" placeholder="Student ID"
             pattern="[0-9]{8}" title="Must be an 8-digit number" required oninput="fillUsername()">
-          
-          <input type="text" name="lastname" class="form-control" placeholder="Last Name" 
-            pattern="[A-Za-z\s]+" title="Letters only" required>
-          
-          <input type="text" name="firstname" class="form-control" placeholder="First Name" 
-            pattern="[A-Za-z\s]+" title="Letters only" required>
-          
-          <input type="text" name="middlename" class="form-control" placeholder="Middle Name (Optional)" 
-            pattern="[A-Za-z\s]*" title="Letters only">
-          
-          <input type="email" name="email" class="form-control" placeholder="Email Address" 
-            pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$" required>
         </div>
-        
-        <!-- Right Column -->
-        <div class="form-column">
+        <div class="form-group">
           <select class="form-control" name="course" required>
             <option value="" disabled selected>Select Course</option>
             <optgroup label="College of Computer Studies">
@@ -42,83 +27,201 @@
             </optgroup>
             <option value="BSN">BS Nursing</option>
             <option value="BSCRIM">BS Criminology</option>
-            
           </select>
-
-          <select class="form-control" name="year_level" required>
-            <option value="" disabled selected>Year Level</option>
-            <option value="1">1st Year</option>
-            <option value="2">2nd Year</option>
-            <option value="3">3rd Year</option>
-            <option value="4">4th Year</option>
-          </select>
-          
-          <input type="text" name="username" id="username" class="form-control" placeholder="Username" required readonly>
-          
-          <input type="password" name="password" id="password" class="form-control" placeholder="Password" 
+        </div>
+        <div class="form-group">
+          <input type="text" name="lastname" class="form-control" placeholder="Last Name"
+            pattern="[A-Za-z\s]+" title="Letters only" required>
+        </div>
+        <div class="form-group">
+          <input type="text" name="year_level" class="form-control" placeholder="Year Level" required list="year-levels">
+          <datalist id="year-levels">
+            <option value="1st Year">
+            <option value="2nd Year">
+            <option value="3rd Year">
+            <option value="4th Year">
+          </datalist>
+        </div>
+        <div class="form-group">
+          <input type="text" name="firstname" class="form-control" placeholder="First Name"
+            pattern="[A-Za-z\s]+" title="Letters only" required>
+        </div>
+        <div class="form-group">
+          <input type="text" name="username" id="username" class="form-control" placeholder="Username" required readonly style="background: #e9ecef;">
+        </div>
+        <div class="form-group">
+          <input type="text" name="middlename" class="form-control" placeholder="Middle Name (Optional)"
+            pattern="[A-Za-z\s]*" title="Letters only">
+        </div>
+        <div class="form-group">
+          <input type="password" name="password" id="password" class="form-control" placeholder="Password"
             pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}" required>
-          
-          <input type="password" name="confirm_password" id="confirm_password" class="form-control" 
+        </div>
+        <div class="form-group">
+          <input type="email" name="email" class="form-control" placeholder="Email Address"
+            pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$" required>
+        </div>
+        <div class="form-group">
+          <input type="password" name="confirm_password" id="confirm_password" class="form-control"
             placeholder="Confirm Password" required>
         </div>
       </div>
-
-      <div class="password-requirements-compact">
-        <span>Password Requirements: </span>
-        <span id="letter" class="invalid">lowercase</span> •
-        <span id="capital" class="invalid">uppercase</span> •
-        <span id="number" class="invalid">number</span> •
-        <span id="length" class="invalid">8+ chars</span>
+      <div class="password-requirements">
+        <small>Password Requirements: </small>
+        <small id="letter" class="invalid">lowercase</small> •
+        <small id="capital" class="invalid">uppercase</small> •
+        <small id="number" class="invalid">number</small> •
+        <small id="length" class="invalid">8+ chars</small>
       </div>
-
-      <button type="submit" class="btn btn-gradient">Create Account</button>
-      <p class="login-link">Already have an account? <a href="{{ url_for('auth.login') }}">Sign In</a></p>
+      <button type="submit" class="register-btn">Create Account</button>
+      <div class="register-footer">
+        Already have an account? <a href="{{ url_for('auth.login') }}">Sign In</a>
+      </div>
     </form>
-  </div>   
+  </div>
 </div>
+
+<style>
+body {
+  background: #f4f5f7 !important;
+}
+.register-bg {
+  min-height: 100vh;
+  background: #f4f5f7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.register-card {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 2px 16px rgba(60,90,130,0.08);
+  padding: 2.5rem 2rem 2rem 2rem;
+  max-width: 540px;
+  width: 100%;
+  margin: 2rem 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.register-title {
+  color: #5a3fa0;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 2rem;
+}
+.register-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.1rem 1.2rem;
+  width: 100%;
+  margin-bottom: 1.2rem;
+}
+.form-group {
+  width: 100%;
+}
+.form-control {
+  width: 100%;
+  padding: 0.7rem 1rem;
+  background: #fff;
+  border: 1px solid #cfd8dc;
+  border-radius: 6px;
+  color: #2c3e50;
+  font-size: 1rem;
+  margin-bottom: 0;
+  transition: border-color 0.2s;
+}
+.form-control:focus {
+  border-color: #6c63ff;
+  background: #f7f7fa;
+  outline: none;
+  box-shadow: 0 0 0 2px #e3f2fd;
+}
+.register-btn {
+  width: 100%;
+  background: #4A3599;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 1.1rem;
+  padding: 0.85rem 0;
+  margin-top: 1.2rem;
+  margin-bottom: 0.7rem;
+  transition: background 0.2s;
+  cursor: pointer;
+}
+.password-requirements {
+  background: #f4f8fb;
+  color: #2c3e50;
+  border: 1px solid #b3e0fc;
+  border-radius: 5px;
+  padding: 0.5rem 0.8rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.97rem;
+  width: 100%;
+}
+.valid {
+  color: #388e3c;
+  font-weight: bold;
+}
+.invalid {
+  color: #dc3545;
+}
+.register-footer {
+  text-align: center;
+  margin-top: 0.5rem;
+  font-size: 1rem;
+  color: #888;
+}
+.register-footer a {
+  color: #5a3fa0;
+  font-weight: 600;
+  text-decoration: none;
+}
+.register-footer a:hover {
+  text-decoration: underline;
+}
+@media (max-width: 700px) {
+  .register-card {
+    padding: 1.2rem 0.5rem;
+  }
+  .register-grid {
+    grid-template-columns: 1fr;
+    gap: 0.9rem 0;
+  }
+}
+</style>
 
 <script>
 function fillUsername() {
   const studentId = document.getElementById('student_id').value;
   document.getElementById('username').value = studentId;
 }
-
 function validateForm() {
   const password = document.getElementById('password').value;
   const confirmPassword = document.getElementById('confirm_password').value;
-  
   if (password !== confirmPassword) {
     alert("Passwords do not match!");
     return false;
   }
   return true;
 }
-
-// Password validation
 const myInput = document.getElementById("password");
 const letter = document.getElementById("letter");
 const capital = document.getElementById("capital");
 const number = document.getElementById("number");
 const length = document.getElementById("length");
-
 myInput.onkeyup = function() {
   const lowerCase = /[a-z]/g;
   const upperCase = /[A-Z]/g;
   const numbers = /[0-9]/g;
-  
-  // Validate lowercase letters
   letter.classList.toggle("valid", myInput.value.match(lowerCase));
   letter.classList.toggle("invalid", !myInput.value.match(lowerCase));
-  
-  // Validate capital letters
   capital.classList.toggle("valid", myInput.value.match(upperCase));
   capital.classList.toggle("invalid", !myInput.value.match(upperCase));
-
-  // Validate numbers
   number.classList.toggle("valid", myInput.value.match(numbers));
   number.classList.toggle("invalid", !myInput.value.match(numbers));
-
-  // Validate length
   length.classList.toggle("valid", myInput.value.length >= 8);
   length.classList.toggle("invalid", myInput.value.length < 8);
 }

@@ -1,83 +1,326 @@
 {% extends 'base.html' %}
 
-{% block title %}{% endblock %}
+{% block title %}Reservation - CCS Sit-In Monitoring System{% endblock %}
 
 {% block content %}
 <div class="dashboard-container">
     <div class="sidebar">
         <h1 class="dashboard-title">Reservation</h1>
-        <a href="{{ url_for('student.dashboard') }}" class="menu-btn">Dashboard</a>
-        <a href="{{ url_for('student.sit_in_history') }}" class="menu-btn">Sit-In History</a>
-        <a href="{{ url_for('student.reserve') }}" class="menu-btn active">Reservation</a>
-        <a href="{{ url_for('student.announcements') }}" class="menu-btn">Announcement</a>
-        <a href="{{ url_for('student.resources') }}" class="menu-btn">Resources</a>
-        <a href="{{ url_for('auth.logout') }}" class="menu-btn logout-btn">Logout</a>
+        {% if student is defined %}
+        <div class="profile">
+            {% if student.profile_picture is defined and student.profile_picture %}
+                <img src="{{ url_for('static', filename=student.profile_picture) }}" alt="Profile" class="profile-pic">
+            {% else %}
+                <img src="{{ url_for('static', filename='images/default-avatar.jpg') }}" alt="Profile" class="profile-pic">
+            {% endif %}
+            <span class="profile-name">{% if student.firstname is defined %}{{ student.firstname }}{% endif %} {% if student.lastname is defined %}{{ student.lastname }}{% endif %}</span>
+        </div>
+        {% endif %}
+        <div class="menu-container">
+            <a href="{{ url_for('student.dashboard') }}" class="menu-btn">
+                <i class="fas fa-tachometer-alt"></i> Dashboard
+            </a>
+            <a href="{{ url_for('student.sit_in_history') }}" class="menu-btn">
+                <i class="fas fa-history"></i> Sit-In History
+            </a>
+            <a href="{{ url_for('student.reserve') }}" class="menu-btn active">
+                <i class="fas fa-calendar-check"></i> Reservation
+            </a>
+            <a href="{{ url_for('student.lab_schedules') }}" class="menu-btn">
+                <i class="fas fa-calendar-alt"></i> Lab Schedules
+            </a>
+            <a href="{{ url_for('student.announcements') }}" class="menu-btn">
+                <i class="fas fa-bullhorn"></i> Announcement
+            </a>
+            <a href="{{ url_for('student.resources') }}" class="menu-btn">
+                <i class="fas fa-book"></i> Resources
+            </a>
+        </div>
+        <a href="{{ url_for('auth.logout') }}" class="menu-btn logout-btn">
+            <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
     </div>
 
-    <div class="content" style="flex:1;">
-        <div style="padding: 32px 32px 0 32px;">
-            <h2 class="section-title"><i class="fas fa-calendar-plus"></i> Reserve a Lab Session</h2>
-        </div>
-        <div class="content-container">
-            {% if success_message %}
-            <div class="success-message">{{ success_message }}</div>
-            {% endif %}
-            <form action="{{ url_for('student.reserve') }}" method="POST" class="reservation-form">
-                {% if csrf_token %}
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() if csrf_token is callable else csrf_token }}">
-                {% endif %}
-
-                <label for="id_number">ID Number:</label>
-                <input type="text" id="id_number" name="id_number" value="{{ id_number }}" readonly>
-
-                <label for="student_name">Student Name:</label>
-                <input type="text" id="student_name" name="student_name" value="{{ student_name }}" readonly>
-
-                <label for="purpose" class="form-label">Purpose <span class="text-danger">*</span></label>
-                <select class="form-select custom-select" id="purpose" name="purpose" required>
-                    <option value="" disabled selected>Select purpose...</option>
-                    <option value="C">C Programming</option>
-                    <option value="Java">Java Programming</option>
-                    <option value="Python">Python Programming</option>
-                    <option value="C#">C# Programming</option>
-                    <option value="Database">Database</option>
-                    <option value="Digital Logic">Digital Logic & Design</option>
-                    <option value="Embedded Systems">Embedded Systems & IoT</option>
-                    <option value="System Integration">System Integration & Architecture</option>
-                    <option value="Computer Application">Computer Application</option>
-                    <option value="Project Management">Project Management</option>
-                    <option value="IT Trends">IT Trends</option>
-                    <option value="Technopreneurship">Technopreneurship</option>
-                    <option value="Capstone">Capstone</option>
-                </select>
-                <div class="invalid-feedback">Please select a purpose.</div>
-
-                <label for="laboratory">Lab:</label>
-                <select class="form-select custom-select" id="laboratory" name="laboratory" required>
-                    <option value="" disabled selected>Select laboratory room...</option>
-                    <option value="524">Room 524 - Computer Laboratory</option>
-                    <option value="526">Room 526 - Computer Laboratory</option>
-                    <option value="527">Room 527 - Computer Laboratory</option>
-                    <option value="530">Room 530 - Computer Laboratory</option>
-                    <option value="542">Room 542 - Computer Laboratory</option>
-                    <option value="544">Room 544 - Computer Laboratory</option>
-                    <option value="517">Room 517 - Computer Laboratory</option>
-                </select>
-
-                <label for="time_in">Time In:</label>
-                <input type="time" id="time_in" name="time_in" required>
-
-                <label for="date">Date:</label>
-                <input type="date" id="date" name="date" required>
-
-                <label for="remaining_session">Remaining Session:</label>
-                <input type="text" id="remaining_session" name="remaining_session" value="{{ remaining_session }}" readonly>
-
-                <button type="submit" class="btn btn-primary" {% if remaining_session == 0 %}disabled{% endif %}>
-                    Reserve Now
-                </button>
-            </form>
+    <div class="main-content">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-12">
+                    <h2 class="section-title">
+                        <i class="fas fa-calendar-plus"></i> Reserve a Lab Session
+                    </h2>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-8 mx-auto">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">New Reservation</h3>
+                        </div>
+                        <div class="card-body">
+                            {% if success_message is defined and success_message %}
+                            <div class="alert alert-success">{{ success_message }}</div>
+                            {% endif %}
+                            
+                            <form action="{{ url_for('student.reserve') }}" method="POST" class="form-container">
+                                {% if csrf_token is defined %}
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token if csrf_token is callable else csrf_token }}">
+                                {% endif %}
+                                
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label for="id_number" class="form-label">ID Number</label>
+                                        <input type="text" id="id_number" name="id_number" class="form-control" value="{{ id_number|default('') }}" readonly>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="student_name" class="form-label">Student Name</label>
+                                        <input type="text" id="student_name" name="student_name" class="form-control" value="{{ student_name|default('') }}" readonly>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label for="purpose" class="form-label">Purpose <span class="text-danger">*</span></label>
+                                        <select class="form-select form-control" id="purpose" name="purpose" required>
+                                            <option value="" disabled selected>Select purpose...</option>
+                                            <option value="C">C Programming</option>
+                                            <option value="Java">Java Programming</option>
+                                            <option value="Python">Python Programming</option>
+                                            <option value="C#">C# Programming</option>
+                                            <option value="Database">Database</option>
+                                            <option value="Digital Logic">Digital Logic & Design</option>
+                                            <option value="Embedded Systems">Embedded Systems & IoT</option>
+                                            <option value="System Integration">System Integration & Architecture</option>
+                                            <option value="Computer Application">Computer Application</option>
+                                            <option value="Project Management">Project Management</option>
+                                            <option value="IT Trends">IT Trends</option>
+                                            <option value="Technopreneurship">Technopreneurship</option>
+                                            <option value="Capstone">Capstone</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="laboratory" class="form-label">Laboratory <span class="text-danger">*</span></label>
+                                        <select class="form-select form-control" id="laboratory" name="laboratory" required>
+                                            <option value="" disabled selected>Select laboratory room...</option>
+                                            <option value="524">Room 524 - Computer Laboratory</option>
+                                            <option value="526">Room 526 - Computer Laboratory</option>
+                                            <option value="527">Room 527 - Computer Laboratory</option>
+                                            <option value="530">Room 530 - Computer Laboratory</option>
+                                            <option value="542">Room 542 - Computer Laboratory</option>
+                                            <option value="544">Room 544 - Computer Laboratory</option>
+                                            <option value="517">Room 517 - Computer Laboratory</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div id="available-computers-container" style="display: none;" class="form-group mb-4">
+                                    <label class="form-label">Available Computers:</label>
+                                    <div id="available-computers-grid" class="computers-grid">
+                                        <div class="loading">Loading available computers...</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label for="time_in" class="form-label">Time In <span class="text-danger">*</span></label>
+                                        <input type="time" id="time_in" name="time_in" class="form-control" required>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="date" class="form-label">Date <span class="text-danger">*</span></label>
+                                        <input type="date" id="date" name="date" class="form-control" required>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="remaining_session" class="form-label">Remaining Session</label>
+                                    <input type="text" id="remaining_session" name="remaining_session" class="form-control" value="{{ remaining_session|default('0') }}" readonly>
+                                </div>
+                                
+                                <div class="form-group text-center mt-4">
+                                    <button type="submit" class="btn btn-primary" {% if remaining_session is not defined or remaining_session == 0 %}disabled{% endif %}>
+                                        <i class="fas fa-calendar-plus"></i> Reserve Now
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
+
+<style>
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-gap: 15px;
+    margin-bottom: 15px;
+}
+
+@media (max-width: 768px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.computers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: 12px;
+    margin-top: 10px;
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 15px;
+    border: 1px solid var(--border-color, #dddddd);
+    border-radius: var(--radius-md, 8px);
+    background-color: var(--light-gray, #f5f5f5);
+}
+
+.computer-item {
+    border: 2px solid var(--success, #28a745);
+    background-color: rgba(40, 167, 69, 0.1);
+    border-radius: var(--radius-md, 8px);
+    padding: 12px 8px;
+    text-align: center;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.computer-item:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-sm, 0 2px 4px rgba(0, 0, 0, 0.1));
+    background-color: rgba(40, 167, 69, 0.2);
+}
+
+.computer-item.selected {
+    background-color: var(--success, #28a745);
+    color: var(--white, #ffffff);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md, 0 4px 6px rgba(0, 0, 0, 0.1));
+}
+
+.loading {
+    padding: 20px;
+    text-align: center;
+    color: var(--text-medium, #555555);
+    width: 100%;
+}
+
+.no-computers {
+    padding: 20px;
+    text-align: center;
+    color: var(--danger, #dc3545);
+    font-style: italic;
+}
+
+.total-computers-info {
+    grid-column: 1 / -1;
+    background-color: rgba(40, 167, 69, 0.05);
+    padding: 8px;
+    border-radius: var(--radius-sm, 4px);
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+    border: 1px solid rgba(40, 167, 69, 0.2);
+}
+
+.total-computers-info p {
+    margin: 0;
+    text-align: center;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const laboratorySelect = document.getElementById('laboratory');
+    const availableComputersContainer = document.getElementById('available-computers-container');
+    const availableComputersGrid = document.getElementById('available-computers-grid');
+    let selectedComputer = null;
+
+    // Add a hidden input to store the selected computer
+    const computerInput = document.createElement('input');
+    computerInput.type = 'hidden';
+    computerInput.name = 'selected_computer';
+    computerInput.id = 'selected_computer';
+    document.querySelector('form').appendChild(computerInput);
+
+    // Set min date to today for the date input
+    const dateInput = document.getElementById('date');
+    if (dateInput) {
+        const today = new Date();
+        const formattedDate = today.toISOString().split('T')[0];
+        dateInput.min = formattedDate;
+    }
+
+    if (laboratorySelect) {
+        laboratorySelect.addEventListener('change', function() {
+            const labRoom = this.value;
+            
+            if (!labRoom) {
+                availableComputersContainer.style.display = 'none';
+                return;
+            }
+            
+            availableComputersContainer.style.display = 'block';
+            availableComputersGrid.innerHTML = '<div class="loading">Loading available computers...</div>';
+            
+            // Fetch available computers for the selected lab
+            fetch(`/student/get-available-computers/${labRoom}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.computers && data.computers.length > 0) {
+                        // Display available computers
+                        availableComputersGrid.innerHTML = `
+                            <div class="total-computers-info">
+                                <p><strong>${data.computers.length}</strong> computers available in Room ${labRoom}</p>
+                            </div>
+                        `;
+                        
+                        data.computers.forEach(computer => {
+                            const computerElement = document.createElement('div');
+                            computerElement.className = 'computer-item';
+                            computerElement.textContent = computer.pc_number || computer.number;
+                            computerElement.dataset.id = computer.id;
+                            
+                            computerElement.addEventListener('click', function() {
+                                // Remove selected class from all computers
+                                document.querySelectorAll('.computer-item').forEach(item => {
+                                    item.classList.remove('selected');
+                                });
+                                
+                                // Add selected class to clicked computer
+                                this.classList.add('selected');
+                                
+                                // Set the selected computer id
+                                selectedComputer = this.dataset.id;
+                                computerInput.value = selectedComputer;
+                            });
+                            
+                            availableComputersGrid.appendChild(computerElement);
+                        });
+                    } else {
+                        // No computers available
+                        availableComputersGrid.innerHTML = `
+                            <div class="no-computers">
+                                No computers available in Room ${labRoom}
+                            </div>
+                        `;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching available computers:', error);
+                    availableComputersGrid.innerHTML = `
+                        <div class="no-computers">
+                            Error loading computers. Please try again.
+                        </div>
+                    `;
+                });
+        });
+    }
+});
+</script>
 {% endblock %}

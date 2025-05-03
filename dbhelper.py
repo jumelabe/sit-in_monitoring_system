@@ -12,6 +12,33 @@ def get_connection():
         conn.commit()
     except sqlite3.OperationalError:
         pass
+        
+    # Ensure we have the sit_in_records table with all needed columns
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS sit_in_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id_number TEXT NOT NULL,
+                name TEXT NOT NULL,
+                purpose TEXT,
+                lab TEXT,
+                login_time DATETIME,
+                logout_time DATETIME,
+                date TEXT,
+                computer_number INTEGER
+            )
+        """)
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
+        
+    # Ensure computer_number column exists in sit_in_records
+    try:
+        conn.execute("ALTER TABLE sit_in_records ADD COLUMN computer_number INTEGER")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
+        
     return conn
 
 def get_user_by_credentials(user_id, password):
@@ -535,8 +562,9 @@ def get_export_data(lab='', purpose=''):
 
 def get_labs():
     """Get list of available laboratories."""
-    return ['Room 524', 'Room 526', 'Room 528', 'Room 530', 
+    labs = ['Room 524', 'Room 526', 'Room 527', 'Room 530', 
             'Room 542', 'Room 544', 'Room 517']
+    return labs
 
 def get_purposes():
     """Get list of available purposes."""
@@ -938,6 +966,62 @@ def ensure_resource_table():
         pass  # Column already exists
     conn.close()
 
+def ensure_computers_table():
+    """Create the computers table if it doesn't exist"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS computers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            lab_room TEXT NOT NULL,
+            pc_number INTEGER NOT NULL,
+            status TEXT DEFAULT 'available',
+            student_id TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(lab_room, pc_number)
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+def initialize_sample_computers():
+    """Initialize sample computers for each lab if none exist"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    # Check if computers already exist
+    cursor.execute("SELECT COUNT(*) FROM computers")
+    count = cursor.fetchone()[0]
+    
+    if count == 0:
+        # No computers exist, let's add sample data
+        labs = get_labs()
+        
+        # For each lab, create 50 computers
+        for lab in labs:
+            # Ensure consistent format for lab rooms - always use "Room XXX" format
+            if not lab.startswith("Room ") and lab.strip().isdigit():
+                lab_room = f"Room {lab.strip()}"
+            else:
+                lab_room = lab
+                
+            print(f"Initializing computers for lab: {lab_room}")
+            
+            for pc_number in range(1, 51):
+                try:
+                    cursor.execute("""
+                        INSERT INTO computers (lab_room, pc_number, status)
+                        VALUES (?, ?, 'available')
+                    """, (lab_room, pc_number))
+                except sqlite3.IntegrityError:
+                    # Skip if already exists (due to unique constraint)
+                    pass
+        
+        conn.commit()
+    
+    conn.close()
+
 def insert_resource(title, description, file_name=None, url=None):
     conn = get_connection()
     cursor = conn.cursor()
@@ -1000,6 +1084,458 @@ def delete_resource(resource_id):
         return file_name
     except Exception as e:
         print(f"Error deleting resource: {e}")
+        return None
+    finally:
+        conn.close()
+
+def get_lab_computer_stats():
+    """Return a list of dicts: lab_room, total, available, in_use, maintenance."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT lab_room,
+               COUNT(*) as total,
+               SUM(CASE WHEN status = 'available' THEN 1 ELSE 0 END) as available,
+               SUM(CASE WHEN status = 'in_use' THEN 1 ELSE 0 END) as in_use,
+               SUM(CASE WHEN status = 'maintenance' THEN 1 ELSE 0 END) as maintenance
+        FROM computers
+        GROUP BY lab_room
+        ORDER BY lab_room
+    """)
+    stats = []
+    for row in cursor.fetchall():
+        stats.append({
+            'lab_room': row[0],
+            'total': row[1],
+            'available': row[2],
+            'in_use': row[3],
+            'maintenance': row[4]
+        })
+    conn.close()
+    return stats
+
+def get_lab_rooms():
+    """Return a list of unique lab rooms from computers table."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT lab_room FROM computers ORDER BY lab_room")
+    labs = [row[0] for row in cursor.fetchall()]
+    conn.close()
+    return labs
+
+def get_computers_by_lab(lab_room):
+    """Return a list of computers for a given lab_room."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id, pc_number, status, student_id
+        FROM computers
+        WHERE lab_room = ?
+        ORDER BY pc_number
+    """, (lab_room,))
+    computers = []
+    for row in cursor.fetchall():
+        computers.append({
+            'id': row[0],
+            'pc_number': row[1],
+            'status': row[2],
+            'student_id': row[3]
+        })
+    conn.close()
+    return computers
+
+def update_computer_status(computer_id, status, student_id=None):
+    """Update the status (and optionally student_id) of a computer."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        # Validate input parameters
+        if not computer_id:
+            raise ValueError("Computer ID is required")
+        
+        if status not in ['available', 'in_use', 'maintenance']:
+            raise ValueError(f"Invalid status: {status}")
+        
+        # First check if the computer exists
+        cursor.execute("SELECT id FROM computers WHERE id = ?", (computer_id,))
+        if not cursor.fetchone():
+            raise ValueError(f"Computer with ID {computer_id} not found")
+        
+        # If assigning to a student, verify student exists
+        if status == 'in_use' and student_id:
+            cursor.execute("SELECT idno FROM students WHERE idno = ?", (student_id,))
+            if not cursor.fetchone():
+                raise ValueError(f"Student with ID {student_id} not found")
+        
+        # Update the database based on status
+        if status == 'in_use' and student_id:
+            cursor.execute(
+                "UPDATE computers SET status=?, student_id=? WHERE id=?",
+                (status, student_id, computer_id)
+            )
+        elif status == 'available':
+            cursor.execute(
+                "UPDATE computers SET status=?, student_id=NULL WHERE id=?",
+                (status, computer_id)
+            )
+        else:
+            cursor.execute(
+                "UPDATE computers SET status=? WHERE id=?",
+                (status, computer_id)
+            )
+            
+        conn.commit()
+        return True
+    except ValueError as e:
+        # Handle validation errors separately to provide better feedback
+        print(f"Validation error in update_computer_status: {str(e)}")
+        conn.rollback()
+        raise
+    except Exception as e:
+        print(f"Database error in update_computer_status: {str(e)}")
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+def ensure_reservation_table():
+    """Create the computer reservation requests table if it doesn't exist"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS computer_reservation_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id TEXT NOT NULL,
+            student_name TEXT NOT NULL,
+            lab_room TEXT NOT NULL,
+            purpose TEXT NOT NULL,
+            date TEXT NOT NULL,
+            time_in TEXT NOT NULL,
+            computer_number INTEGER,
+            status TEXT DEFAULT 'pending',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            notes TEXT
+        )
+    """)
+    conn.commit()
+    
+    # Check if notes column exists, add it if not
+    try:
+        cursor.execute("SELECT notes FROM computer_reservation_requests LIMIT 1")
+    except sqlite3.OperationalError:
+        try:
+            cursor.execute("ALTER TABLE computer_reservation_requests ADD COLUMN notes TEXT")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass  # Column might already exist
+    
+    conn.close()
+
+def get_reservation_requests():
+    """Get all pending reservation requests"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT * FROM computer_reservation_requests
+        WHERE status = 'pending'
+        ORDER BY date, time_in
+    """)
+    requests = cursor.fetchall()
+    conn.close()
+    return requests
+
+def get_reservation_logs(filters=None):
+    """Get all reservation logs with optional filtering"""
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    try:
+        # Ensure the reservation_logs table exists
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS reservation_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                request_id INTEGER,
+                student_id TEXT,
+                lab_room TEXT,
+                computer_number INTEGER,
+                purpose TEXT,
+                reservation_time TEXT,
+                action TEXT,
+                status TEXT,
+                details TEXT,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
+        
+        # Base query
+        query = """
+            SELECT 
+                id, request_id, student_id, lab_room, computer_number, purpose,
+                reservation_time, action, status, details, 
+                datetime(timestamp, 'localtime') as formatted_timestamp
+            FROM reservation_logs
+        """
+        
+        params = []
+        
+        # Apply filters if provided
+        if filters:
+            where_clauses = []
+            if filters.get('student_id'):
+                where_clauses.append("student_id = ?")
+                params.append(filters['student_id'])
+            if filters.get('lab_room'):
+                where_clauses.append("lab_room = ?")
+                params.append(filters['lab_room'])
+            if filters.get('status'):
+                where_clauses.append("status = ?")
+                params.append(filters['status'])
+            if filters.get('action'):
+                where_clauses.append("action = ?")
+                params.append(filters['action'])
+            
+            if where_clauses:
+                query += " WHERE " + " AND ".join(where_clauses)
+        
+        # Order by timestamp descending
+        query += " ORDER BY timestamp DESC"
+        
+        cursor.execute(query, params)
+        logs = cursor.fetchall()
+        
+        # Format the logs
+        formatted_logs = []
+        for log in logs:
+            log_dict = {}
+            for key in log.keys():
+                log_dict[key] = log[key]
+            formatted_logs.append(log_dict)
+        
+        return formatted_logs
+    except Exception as e:
+        print(f"Error getting reservation logs: {e}")
+        return []
+    finally:
+        conn.close()
+
+def log_reservation_action(request_id, action, details=''):
+    """Log a reservation action to the reservation_logs table.
+    Always call this after approving or denying a reservation to ensure logs are up-to-date.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # Ensure the reservation_logs table exists
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS reservation_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                request_id INTEGER,
+                student_id TEXT,
+                lab_room TEXT,
+                computer_number INTEGER,
+                purpose TEXT,
+                reservation_time TEXT,
+                action TEXT,
+                status TEXT,
+                details TEXT,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
+        
+        # Get the reservation details
+        cursor.execute("""
+            SELECT student_id, student_name, lab_room, computer_number, purpose, 
+                   date, time_in, status
+            FROM computer_reservation_requests 
+            WHERE id = ?
+        """, (request_id,))
+        
+        reservation = cursor.fetchone()
+        if not reservation:
+            raise Exception(f"Reservation request {request_id} not found")
+        
+        # Sanitize values - make sure we don't have any None values
+        student_id = reservation['student_id'] or ''
+        lab_room = reservation['lab_room'] or ''
+        computer_number = reservation['computer_number'] or 0
+        purpose = reservation['purpose'] or ''
+        date = reservation['date'] or ''
+        time_in = reservation['time_in'] or ''
+        
+        # Set status based on action (for consistent display) and update the database
+        if action == 'approved':
+            status = 'approved'
+            # Update the request status in computer_reservation_requests table
+            cursor.execute("""
+                UPDATE computer_reservation_requests 
+                SET status = 'approved' 
+                WHERE id = ?
+            """, (request_id,))
+        elif action == 'denied':
+            status = 'denied'
+            # Update the request status in computer_reservation_requests table
+            cursor.execute("""
+                UPDATE computer_reservation_requests 
+                SET status = 'denied' 
+                WHERE id = ?
+            """, (request_id,))
+        else:
+            status = reservation['status'] or 'pending'
+        
+        # Format the reservation time
+        reservation_time = f"{date} {time_in}"
+        if reservation_time.strip() == ' ':
+            reservation_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Log the action
+        cursor.execute("""
+            INSERT INTO reservation_logs (
+                request_id, student_id, lab_room, computer_number, purpose,
+                reservation_time, action, status, details, timestamp
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
+        """, (
+            request_id,
+            student_id,
+            lab_room,
+            computer_number,
+            purpose,
+            reservation_time,
+            action,
+            status,
+            details
+        ))
+        
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error in log_reservation_action: {e}")
+        conn.rollback()
+        return False
+    finally:
+        conn.close()
+
+def reset_computers_table():
+    """Drop and recreate the computers table with 50 computers per lab"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        # Drop the existing table
+        cursor.execute("DROP TABLE IF EXISTS computers")
+        conn.commit()
+        
+        # Recreate the table
+        ensure_computers_table()
+        
+        # Initialize with 50 computers per lab
+        initialize_sample_computers()
+        
+        return True
+    except Exception as e:
+        print(f"Error resetting computers table: {e}")
+        conn.rollback()
+        return False
+    finally:
+        conn.close()
+
+def create_reservation(reservation_data):
+    """Create a new computer reservation request"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # Get student name
+        student_id = reservation_data['id_number']
+        cursor.execute("SELECT firstname, lastname FROM students WHERE idno = ?", (student_id,))
+        student = cursor.fetchone()
+        
+        if not student:
+            raise Exception("Student not found")
+        
+        # Check if student already has an active sit-in session
+        cursor.execute("""
+            SELECT COUNT(*) FROM sit_in_records 
+            WHERE id_number = ? AND logout_time IS NULL
+        """, (student_id,))
+        active_sessions = cursor.fetchone()[0]
+        
+        if active_sessions > 0:
+            raise Exception("You already have an active sit-in session. You cannot create a new reservation until your current session is completed.")
+        
+        # Get the date and time for the new reservation
+        new_date = reservation_data['date']
+        new_time = reservation_data['time_in']
+        
+        # Check if student already has a reservation for the same date and time
+        cursor.execute("""
+            SELECT COUNT(*) FROM computer_reservation_requests 
+            WHERE student_id = ? AND date = ? AND time_in = ? AND status IN ('pending', 'approved')
+        """, (student_id, new_date, new_time))
+        conflicting_reservations = cursor.fetchone()[0]
+        
+        if conflicting_reservations > 0:
+            raise Exception("You already have a reservation for this date and time. Please choose a different time slot.")
+            
+        student_name = f"{student['firstname']} {student['lastname']}"
+        
+        # Create the reservation request
+        cursor.execute("""
+            INSERT INTO computer_reservation_requests (
+                student_id, student_name, lab_room, purpose, date, time_in, computer_number, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
+        """, (
+            student_id,
+            student_name,
+            reservation_data['lab'],
+            reservation_data['purpose'],
+            reservation_data['date'],
+            reservation_data['time_in'],
+            # Extract computer number from computer_id
+            get_computer_number_by_id(reservation_data['computer_id']),
+            # Status is pending by default
+        ))
+        
+        # Get the ID of the newly created reservation
+        cursor.execute("SELECT last_insert_rowid()")
+        request_id = cursor.fetchone()[0]
+        
+        # If reservation is successful, temporarily mark the computer as 'reserved'
+        # We don't update the computer yet, it will be updated when admin approves the reservation
+        
+        conn.commit()
+        
+        # Log the reservation creation
+        try:
+            log_reservation_action(
+                request_id, 
+                'created', 
+                f"Reservation created for {reservation_data['date']} at {reservation_data['time_in']}"
+            )
+        except Exception as e:
+            print(f"Error logging reservation creation: {e}")
+            # Don't fail the entire process if logging fails
+        
+        return True
+    except Exception as e:
+        print(f"Error creating reservation: {e}")
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+def get_computer_number_by_id(computer_id):
+    """Get the PC number for a computer by its ID"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT pc_number FROM computers WHERE id = ?", (computer_id,))
+        result = cursor.fetchone()
+        return result['pc_number'] if result else None
+    except Exception as e:
+        print(f"Error getting computer number: {e}")
         return None
     finally:
         conn.close()

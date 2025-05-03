@@ -1,480 +1,212 @@
 {% extends 'base.html' %}
-{% block title %}{% endblock %}
+{% block title %}Sit-In History - CCS Sit-In Monitoring System{% endblock %}
 {% block content %}
 <div class="dashboard-container">
     <div class="sidebar">
         <h1 class="dashboard-title">History</h1>
-        <a href="{{ url_for('student.dashboard') }}" class="menu-btn">Dashboard</a>
-        <a href="{{ url_for('student.sit_in_history') }}" class="menu-btn active">Sit-In History</a>
-        <a href="{{ url_for('student.reserve') }}" class="menu-btn">Reservation</a>
-        <a href="{{ url_for('student.announcements') }}" class="menu-btn">Announcement</a>
-        <a href="{{ url_for('student.resources') }}" class="menu-btn">Resources</a>
-        <a href="{{ url_for('auth.logout') }}" class="menu-btn logout-btn">Logout</a>
+        {% if student is defined %}
+        <div class="profile">
+            {% if student.profile_picture is defined and student.profile_picture %}
+                <img src="{{ url_for('static', filename=student.profile_picture) }}" alt="Profile" class="profile-pic">
+            {% else %}
+                <img src="{{ url_for('static', filename='images/default-avatar.jpg') }}" alt="Profile" class="profile-pic">
+            {% endif %}
+            <span class="profile-name">{% if student.firstname is defined %}{{ student.firstname }}{% endif %} {% if student.lastname is defined %}{{ student.lastname }}{% endif %}</span>
+        </div>
+        {% endif %}
+        <div class="menu-container">
+            <a href="{{ url_for('student.dashboard') }}" class="menu-btn">
+                <i class="fas fa-tachometer-alt"></i> Dashboard
+            </a>
+            <a href="{{ url_for('student.sit_in_history') }}" class="menu-btn active">
+                <i class="fas fa-history"></i> Sit-In History
+            </a>
+            <a href="{{ url_for('student.reserve') }}" class="menu-btn">
+                <i class="fas fa-calendar-check"></i> Reservation
+            </a>
+            <a href="{{ url_for('student.lab_schedules') }}" class="menu-btn">
+                <i class="fas fa-calendar-alt"></i> Lab Schedules
+            </a>
+            <a href="{{ url_for('student.announcements') }}" class="menu-btn">
+                <i class="fas fa-bullhorn"></i> Announcement
+            </a>
+            <a href="{{ url_for('student.resources') }}" class="menu-btn">
+                <i class="fas fa-book"></i> Resources
+            </a>
+        </div>
+        <a href="{{ url_for('auth.logout') }}" class="menu-btn logout-btn">
+            <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
     </div>
 
-    <div class="content">
-        <div class="container">
-            <div class="sit-in-list">
-                <h2 class="section-title"><i class="fas fa-history"></i> My Sit-In History</h2>
-                <input type="text" id="searchInput" onkeyup="searchHistory()" placeholder="Search history..." class="form-control mb-3">
-                <table class="table table-bordered table-hover" id="historyTable">
-                    <thead class="thead-dark">
-                        <tr>
-                            <th>Date</th>
-                            <th>Purpose</th>
-                            <th>Laboratory</th>
-                            <th>Time In</th>
-                            <th>Time Out</th>
-                            <th>Status</th>
-                            <th>Feedback</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for record in history %}
-                        <tr>
-                            <td>{{ record.date }}</td>
-                            <td>{{ record.sit_purpose }}</td>
-                            <td>{{ record.laboratory }}</td>
-                            <td>{{ record.login_time }}</td>
-                            <td>{{ record.logout_time if record.logout_time else 'Active' }}</td>
-                            <td>
-                                <span class="badge {% if record.logout_time %}bg-success{% else %}bg-primary{% endif %}">
-                                    {{ 'Completed' if record.logout_time else 'Active' }}
-                                </span>
-                            </td>
-                            <td>
-                                {% if record.feedback %}
-                                    <div class="feedback-content">
-                                        <p class="mb-0">{{ record.feedback }}</p>
-                                        <small class="text-muted">Submitted: {{ record.feedback_date }}</small>
-                                    </div>
+    <div class="main-content">
+        <div class="container-fluid">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-history"></i> My Sit-In History</h3>
+                </div>
+                <div class="card-body">
+                    <input type="text" id="searchInput" onkeyup="searchHistory()" placeholder="Search history..." class="form-control mb-3">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover" id="historyTable">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Purpose</th>
+                                    <th>Laboratory</th>
+                                    <th>Time In</th>
+                                    <th>Time Out</th>
+                                    <th>Status</th>
+                                    <th>Feedback</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if history is defined and history %}
+                                    {% for record in history %}
+                                    <tr>
+                                        <td>{{ record.date }}</td>
+                                        <td>{{ record.sit_purpose }}</td>
+                                        <td>{{ record.laboratory }}</td>
+                                        <td>{{ record.login_time }}</td>
+                                        <td>{{ record.logout_time if record.logout_time else 'Active' }}</td>
+                                        <td>
+                                            <span class="badge {% if record.logout_time %}bg-success{% else %}bg-primary{% endif %}">
+                                                {{ 'Completed' if record.logout_time else 'Active' }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% if record.feedback %}
+                                                <div class="feedback-content">
+                                                    <p class="mb-0">{{ record.feedback }}</p>
+                                                    <small class="text-muted">Submitted: {{ record.feedback_date }}</small>
+                                                </div>
+                                            {% else %}
+                                                {% if record.logout_time %}  <!-- Only show feedback button for completed sessions -->
+                                                    <button type="button" class="btn btn-sm btn-primary feedback-btn" 
+                                                            data-bs-toggle="modal" 
+                                                            data-bs-target="#feedbackModal-{{ record.id }}">
+                                                        <i class="fas fa-comment-dots me-1"></i> Add Feedback
+                                                    </button>
+                                                {% else %}
+                                                    <span class="text-muted">Session in progress</span>
+                                                {% endif %}
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
                                 {% else %}
-                                    {% if record.logout_time %}  <!-- Only show feedback button for completed sessions -->
-                                        <button type="button" class="btn btn-sm btn-primary feedback-btn" 
-                                                data-bs-toggle="modal" 
-                                                data-bs-target="#feedbackModal-{{ record.id }}">
-                                            <i class="fas fa-comment-dots me-1"></i> Add Feedback
-                                        </button>
-                                    {% else %}
-                                        <span class="text-muted">Session in progress</span>
-                                    {% endif %}
+                                    <tr>
+                                        <td colspan="7" class="text-center py-4">
+                                            <i class="fas fa-info-circle me-2"></i> No history records found
+                                        </td>
+                                    </tr>
                                 {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-
-                <!-- Move Modals outside the table -->
-                {% for record in history %}
-                    {% if not record.feedback %}
-                    <div class="modal fade feedback-modal" id="feedbackModal-{{ record.id }}" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered custom-modal">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title">
-                                        <i class="fas fa-comment-dots me-2"></i>
-                                        Add Feedback for {{ record.laboratory }}
-                                    </h5>
-                                </div>
-                                <form action="{{ url_for('student.submit_feedback') }}" method="POST" class="feedback-form">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                                    <div class="modal-body">
-                                        <input type="hidden" name="history_id" value="{{ record.id }}">
-                                        <div class="session-details mb-4">
-                                            <div class="detail-item">
-                                                <span class="label">Date:</span>
-                                                <span class="value">{{ record.date }}</span>
-                                            </div>
-                                            <div class="detail-item">
-                                                <span class="label">Purpose:</span>
-                                                <span class="value">{{ record.sit_purpose }}</span>
-                                            </div>
-                                            <div class="detail-item">
-                                                <span class="label">Laboratory:</span>
-                                                <span class="value">{{ record.laboratory }}</span>
-                                            </div>
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="feedback-{{ record.id }}" class="form-label">Your Feedback</label>
-                                            <textarea class="form-control feedback-textarea" 
-                                                    id="feedback-{{ record.id }}"
-                                                    name="feedback" 
-                                                    rows="4" 
-                                                    required
-                                                    placeholder="Please share your experience with this session..."></textarea>
-                                        </div>
-                                    </div>
-                                    <div class="modal-footer">
-                                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                                        <button type="submit" class="btn btn-primary submit-feedback">
-                                            <i class="fas fa-paper-plane me-1"></i> Submit Feedback
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
+                            </tbody>
+                        </table>
                     </div>
-                    {% endif %}
-                {% endfor %}
+                </div>
             </div>
         </div>
+
+        <!-- Move Modals outside the table -->
+        {% if history is defined and history %}
+            {% for record in history %}
+                {% if not record.feedback and record.id is defined %}
+                <div class="modal fade feedback-modal" id="feedbackModal-{{ record.id }}" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">
+                                    <i class="fas fa-comment-dots me-2"></i>
+                                    Add Feedback for {{ record.laboratory }}
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <form action="{{ url_for('student.submit_feedback') }}" method="POST" class="feedback-form">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token if csrf_token is defined else '' }}">
+                                <div class="modal-body">
+                                    <input type="hidden" name="history_id" value="{{ record.id }}">
+                                    <div class="session-details mb-4">
+                                        <div class="detail-item">
+                                            <span class="label">Date:</span>
+                                            <span class="value">{{ record.date }}</span>
+                                        </div>
+                                        <div class="detail-item">
+                                            <span class="label">Purpose:</span>
+                                            <span class="value">{{ record.sit_purpose }}</span>
+                                        </div>
+                                        <div class="detail-item">
+                                            <span class="label">Laboratory:</span>
+                                            <span class="value">{{ record.laboratory }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="feedback-{{ record.id }}" class="form-label">Your Feedback</label>
+                                        <textarea class="form-control feedback-textarea" 
+                                                id="feedback-{{ record.id }}"
+                                                name="feedback" 
+                                                rows="4" 
+                                                required
+                                                placeholder="Please share your experience with this session..."></textarea>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="submit" class="btn btn-primary submit-feedback">
+                                        <i class="fas fa-paper-plane me-1"></i> Submit Feedback
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            {% endfor %}
+        {% endif %}
     </div>
 </div>
 
 <style>
-    .container {
-        display: flex;
-        justify-content: space-between;
-        gap: 20px;
-        flex-wrap: wrap;
-        max-width: 1400px;
-        margin: 0 auto;
-        padding: 20px;
-    }
-
-    .sit-in-list {
-        background: #fff;
-        padding: 30px;
-        border-radius: 15px;
-        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-        flex: 1;
-        width: 100%;
-        overflow-x: auto;
-    }
-
-    #historyTable {
-        width: 100%;
-        border-collapse: separate;
-        border-spacing: 0;
-        margin-top: 20px;
-        font-size: 15px;
-    }
-
-    #historyTable th {
-        background-color: #2c3e50;
-        color: white;
-        padding: 15px;
-        text-align: center;
-        font-weight: 600;
-        white-space: nowrap;
-    }
-
-    #historyTable td {
-        padding: 12px 15px;
-        text-align: center;
-        vertical-align: middle;
-    }
-
-    #historyTable tbody tr:hover {
-        background-color: #f5f6fa;
-        transition: background-color 0.3s ease;
-    }
-
-    #searchInput {
-        max-width: 400px;
-        margin: 0 auto 20px;
-        padding: 12px 20px;
-        border: 2px solid #e0e0e0;
-        border-radius: 8px;
-        font-size: 16px;
-        transition: border-color 0.3s ease;
-        display: block;
-    }
-
-    #searchInput:focus {
-        border-color: #2c3e50;
-        outline: none;
-        box-shadow: 0 0 0 3px rgba(44, 62, 80, 0.1);
-    }
-
-    .badge {
-        padding: 8px 12px;
-        border-radius: 6px;
-        font-weight: 500;
-        font-size: 14px;
-    }
-
-    /* Responsive table */
-    @media (max-width: 1200px) {
-        .container {
-            padding: 10px;
-        }
-        
-        #historyTable {
-            font-size: 14px;
-        }
-        
-        #historyTable th,
-        #historyTable td {
-            padding: 10px;
-        }
-    }
-
-    .feedback-content {
-        background: #f8f9fa;
-        padding: 10px;
-        border-radius: 6px;
-        border-left: 3px solid #4a3599;
-    }
-
-    .feedback-content p {
-        color: #2c3e50;
-        font-size: 0.9rem;
-    }
-
-    .feedback-content small {
-        font-size: 0.8rem;
-    }
-
-    .feedback-btn {
-        background: #4a3599;
-        border: none;
-        transition: all 0.3s ease;
-    }
-
-    .feedback-btn:hover {
-        background: #3a267a;
-        transform: translateY(-2px);
-    }
-
-    .feedback-textarea {
-        resize: vertical;
-        min-height: 100px;
-    }
-
-    .feedback-textarea:focus {
-        border-color: #4a3599;
-        box-shadow: 0 0 0 0.2rem rgba(74, 53, 153, 0.25);
-    }
-
-    /* Modal Styling */
-    .feedback-modal .modal-content {
-        border: none;
-        border-radius: 15px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-    }
-
-    .feedback-modal .modal-header {
-        background: #4a3599;
-        color: white;
-        border-bottom: none;
-        border-radius: 15px 15px 0 0;
-        padding: 1.5rem;
-    }
-
-    .feedback-modal .btn-close {
-        filter: brightness(0) invert(1);
-        opacity: 0.8;
-    }
-
-    .feedback-modal .modal-title {
-        font-size: 1.25rem;
-        font-weight: 600;
-    }
-
-    .session-details {
-        background: #f8f9fa;
-        border-radius: 10px;
-        padding: 1rem;
-        margin-bottom: 1.5rem;
-    }
-
     .detail-item {
-        display: flex;
-        margin-bottom: 0.5rem;
+        margin-bottom: 8px;
     }
-
-    .detail-item:last-child {
-        margin-bottom: 0;
-    }
-
+    
     .detail-item .label {
         font-weight: 600;
-        min-width: 100px;
-        color: #4a5568;
+        color: var(--text-medium, #555555);
+        margin-right: 8px;
     }
-
-    .detail-item .value {
-        color: #2d3748;
-    }
-
-    .feedback-textarea {
-        border: 2px solid #e2e8f0;
-        border-radius: 10px;
-        padding: 1rem;
-        resize: vertical;
-        min-height: 120px;
-        transition: all 0.3s ease;
-    }
-
-    .feedback-textarea:focus {
-        border-color: #4a3599;
-        box-shadow: 0 0 0 3px rgba(74, 53, 153, 0.1);
-    }
-
-    .feedback-modal .modal-footer {
-        border-top: 1px solid #e2e8f0;
-        padding: 1.25rem;
-    }
-
-    .submit-feedback {
-        background: #4a3599;
-        border: none;
-        padding: 0.5rem 1.5rem;
-        transition: all 0.3s ease;
-    }
-
-    .submit-feedback:hover {
-        background: #3a267a;
-        transform: translateY(-1px);
-    }
-
-    @media (max-width: 576px) {
-        .feedback-modal .modal-dialog {
-            margin: 0.5rem;
-        }
-    }
-
-    /* Enhanced Modal Styling */
-    .custom-modal {
-        max-width: 600px;
-        width: 95%;
-        margin: 1.75rem auto;
-    }
-
-    .feedback-modal .modal-content {
-        border: none;
-        border-radius: 15px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-        position: relative;
-        overflow: hidden;
-    }
-
-    .feedback-modal .modal-header {
-        background: #4a3599;
-        color: white;
-        border-bottom: none;
-        border-radius: 15px 15px 0 0;
-        padding: 1.25rem 1.5rem;
-    }
-
-    .feedback-modal .btn-close {
-        color: white;
-        opacity: 1;
-        text-shadow: none;
-        font-size: 1.5rem;
-    }
-
-    .feedback-modal .modal-body {
-        padding: 1.5rem;
-        background: white;
-    }
-
-    .feedback-modal .modal-footer {
-        padding: 1rem 1.5rem;
-        background: #f8f9fa;
-        border-top: 1px solid #edf2f7;
-    }
-
-    .session-details {
-        background: #f8f9fa;
-        border-radius: 12px;
-        padding: 1.25rem;
-        margin-bottom: 1.5rem;
-    }
-
-    .feedback-textarea {
-        min-height: 150px;
-        padding: 1rem;
-        font-size: 1rem;
-        line-height: 1.5;
+    
+    .feedback-content {
+        background-color: var(--light-gray, #f5f5f5);
+        padding: 8px;
+        border-radius: var(--radius-sm, 4px);
+        border-left: 3px solid var(--primary, #4a3599);
     }
 </style>
 
 <script>
     function searchHistory() {
-        var input = document.getElementById("searchInput");
-        var filter = input.value.toUpperCase();
-        var table = document.getElementById("historyTable");
-        var tr = table.getElementsByTagName("tr");
-
-        for (var i = 1; i < tr.length; i++) {
-            var td = tr[i].getElementsByTagName("td");
-            var found = false;
-            
-            for (var j = 0; j < td.length; j++) {
-                if (td[j]) {
-                    var txtValue = td[j].textContent || td[j].innerText;
+        const input = document.getElementById('searchInput');
+        const filter = input.value.toUpperCase();
+        const table = document.getElementById('historyTable');
+        const tr = table.getElementsByTagName('tr');
+        
+        for (let i = 1; i < tr.length; i++) {
+            let visible = false;
+            const td = tr[i].getElementsByTagName('td');
+            for (let j = 0; j < td.length; j++) {
+                const cell = td[j];
+                if (cell) {
+                    const txtValue = cell.textContent || cell.innerText;
                     if (txtValue.toUpperCase().indexOf(filter) > -1) {
-                        found = true;
+                        visible = true;
                         break;
                     }
                 }
             }
-            
-            tr[i].style.display = found ? "" : "none";
+            tr[i].style.display = visible ? '' : 'none';
         }
     }
-
-    document.addEventListener('DOMContentLoaded', function() {
-        var modals = document.querySelectorAll('.modal');
-        modals.forEach(function(modal) {
-            modal.addEventListener('show.bs.modal', function() {
-                console.log('Modal is showing:', modal.id);
-            });
-        });
-    });
-</script>
-
-<!-- Add these in the head section -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-
-<!-- Replace the existing scripts section at the bottom -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-    // Search functionality
-    function searchHistory() {
-        // ...existing search code...
-    }
-
-    // Initialize modals when the document is ready
-    document.addEventListener('DOMContentLoaded', function() {
-        // Initialize all modals
-        var modals = document.querySelectorAll('.modal');
-        modals.forEach(function(modal) {
-            new bootstrap.Modal(modal);
-        });
-
-        // Add click handlers to feedback buttons
-        var feedbackButtons = document.querySelectorAll('.feedback-btn');
-        feedbackButtons.forEach(function(button) {
-            button.addEventListener('click', function() {
-                var modalId = this.getAttribute('data-bs-target');
-                var modal = document.querySelector(modalId);
-                var bsModal = bootstrap.Modal.getInstance(modal) || new bootstrap.Modal(modal);
-                bsModal.show();
-            });
-        });
-
-        // Handle form submission
-        var feedbackForms = document.querySelectorAll('.feedback-form');
-        feedbackForms.forEach(function(form) {
-            form.addEventListener('submit', function(e) {
-                var submitButton = form.querySelector('.submit-feedback');
-                var textarea = form.querySelector('.feedback-textarea');
-                
-                if (!textarea.value.trim()) {
-                    e.preventDefault();
-                    textarea.classList.add('is-invalid');
-                    return;
-                }
-                
-                submitButton.disabled = true;
-                submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
-            });
-        });
-    });
 </script>
 {% endblock %}

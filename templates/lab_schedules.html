@@ -1,0 +1,182 @@
+{% extends 'base.html' %}
+
+{% block title %}Lab Schedules - CCS Sit-In Monitoring System{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="sidebar">
+        <h1 class="dashboard-title">Lab Schedules</h1>
+        {% if student is defined %}
+        <div class="profile">
+            {% if student.profile_picture is defined and student.profile_picture %}
+                <img src="{{ url_for('static', filename=student.profile_picture) }}" alt="Profile" class="profile-pic">
+            {% else %}
+                <img src="{{ url_for('static', filename='images/default-avatar.jpg') }}" alt="Profile" class="profile-pic">
+            {% endif %}
+            <span class="profile-name">{% if student.firstname is defined %}{{ student.firstname }}{% endif %} {% if student.lastname is defined %}{{ student.lastname }}{% endif %}</span>
+        </div>
+        {% endif %}
+        <div class="menu-container">
+            <a href="{{ url_for('student.dashboard') }}" class="menu-btn">
+                <i class="fas fa-tachometer-alt"></i> Dashboard
+            </a>
+            <a href="{{ url_for('student.sit_in_history') }}" class="menu-btn">
+                <i class="fas fa-history"></i> Sit-In History
+            </a>
+            <a href="{{ url_for('student.reserve') }}" class="menu-btn">
+                <i class="fas fa-calendar-check"></i> Reservation
+            </a>
+            <a href="{{ url_for('student.lab_schedules') }}" class="menu-btn active">
+                <i class="fas fa-calendar-alt"></i> Lab Schedules
+            </a>
+            <a href="{{ url_for('student.announcements') }}" class="menu-btn">
+                <i class="fas fa-bullhorn"></i> Announcement
+            </a>
+            <a href="{{ url_for('student.resources') }}" class="menu-btn">
+                <i class="fas fa-book"></i> Resources
+            </a>
+        </div>
+        <a href="{{ url_for('auth.logout') }}" class="menu-btn logout-btn">
+            <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
+    </div>
+    
+    <div class="main-content">
+        <div class="container-fluid">
+            <div class="row mb-4">
+                <div class="col">
+                    <h2 class="section-title">
+                        <i class="fas fa-calendar-alt"></i> Lab Schedules
+                    </h2>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> 
+                        View available computers in each laboratory without making a reservation.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                {% if labs is defined and labs %}
+                    {% for lab in labs %}
+                    <div class="col-md-6 mb-4">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h3 class="card-title">{{ lab.name }}</h3>
+                                <span class="badge {% if lab.available > 0 %}bg-success{% else %}bg-danger{% endif %}">
+                                    {{ lab.available }} / {{ lab.total }} available
+                                </span>
+                            </div>
+                            <div class="card-body">
+                                <div class="computer-grid">
+                                    {% if lab.computers is defined %}
+                                        {% for computer in lab.computers %}
+                                        <div class="computer-item">
+                                            <div class="computer-box {% if computer.status == 'available' %}available{% elif computer.status == 'in_use' %}in-use{% else %}maintenance{% endif %}">
+                                                {{ computer.pc_number }}
+                                            </div>
+                                            <span class="status-indicator">
+                                                {% if computer.status == 'available' %}
+                                                <i class="fas fa-check-circle text-success"></i>
+                                                {% elif computer.status == 'in_use' %}
+                                                <i class="fas fa-user text-danger"></i>
+                                                {% else %}
+                                                <i class="fas fa-tools text-warning"></i>
+                                                {% endif %}
+                                            </span>
+                                        </div>
+                                        {% endfor %}
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="card-footer">
+                                <div class="d-flex justify-content-between">
+                                    <div>
+                                        <span class="legend-item">
+                                            <i class="fas fa-square text-success"></i> Available
+                                        </span>
+                                        <span class="legend-item">
+                                            <i class="fas fa-square text-danger"></i> In Use
+                                        </span>
+                                        <span class="legend-item">
+                                            <i class="fas fa-square text-warning"></i> Maintenance
+                                        </span>
+                                    </div>
+                                    <a href="{{ url_for('student.reserve') }}" class="btn btn-primary btn-sm">
+                                        <i class="fas fa-calendar-check"></i> Reserve Computer
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body text-center py-5">
+                                <i class="fas fa-info-circle fs-1 text-muted mb-3"></i>
+                                <p class="mb-0">No laboratory information available at this time.</p>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .computer-grid {
+        display: grid;
+        grid-template-columns: repeat(10, 1fr);
+        gap: 10px;
+        margin-bottom: 15px;
+    }
+    
+    .computer-box {
+        width: 100%;
+        aspect-ratio: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 5px;
+        font-weight: bold;
+        color: #fff;
+        position: relative;
+    }
+    
+    .computer-box.available {
+        background-color: var(--success, #28a745);
+    }
+    
+    .computer-box.in-use {
+        background-color: var(--danger, #dc3545);
+    }
+    
+    .computer-box.maintenance {
+        background-color: var(--warning, #ffc107);
+        color: #212529;
+    }
+    
+    .computer-item {
+        position: relative;
+    }
+    
+    .status-indicator {
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        font-size: 12px;
+    }
+    
+    .legend-item {
+        margin-right: 15px;
+        font-size: 0.8rem;
+    }
+    
+    @media (max-width: 768px) {
+        .computer-grid {
+            grid-template-columns: repeat(5, 1fr);
+        }
+    }
+</style>
+{% endblock %} 

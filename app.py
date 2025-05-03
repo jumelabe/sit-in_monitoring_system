@@ -3,6 +3,7 @@ from werkzeug.utils import secure_filename
 from datetime import timedelta, datetime
 from functools import wraps
 import os
+import sqlite3
 from PIL import Image
 from flask_wtf.csrf import CSRFProtect
 
@@ -25,6 +26,16 @@ UPLOAD_FOLDER = 'static/uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['SESSION_REFRESH_EACH_REQUEST'] = True
 app.config['SESSION_TYPE'] = 'filesystem'
+
+# Initialize database tables
+try:
+    ensure_computers_table()
+    initialize_sample_computers()
+    ensure_reservation_table()
+    ensure_resource_table()
+    print("Database tables initialized successfully")
+except Exception as e:
+    print(f"Error initializing database tables: {e}")
 
 from routes.auth_routes import auth_bp
 from routes.student_routes import student_bp

@@ -2,43 +2,101 @@
 
 {% block title %}Login - CCS Sit-In Monitoring System{% endblock %}
 
-{% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
-{% endblock %}
-
 {% block content %}
-<div class="login-container">
-  <div class="login-form">
-    <h2>Sign In</h2>
-    <form method="POST" action="{{ url_for('auth.login') }}" novalidate>
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <div class="form-group">
-        <label for="user_id">User ID</label>
-        <input type="text" id="user_id" name="user_id" class="form-control" required 
-               minlength="3" maxlength="50" placeholder="Enter your user ID">
+<div class="auth-container" style="background: #f4f8fb;">
+  <div class="login-container" style="background: #fff; border-radius: 12px; box-shadow: 0 2px 16px rgba(60,90,130,0.08);">
+    <div class="login-info" style="background:#4A3599; border-radius: 12px 0 0 12px;">
+      <div class="text-center" style="color: #fff;">
+        <img src="{{ url_for('static', filename='images/css.png') }}" alt="Logo" class="login-logo" style="background: #fff; border-radius: 50%; padding: 8px;">
+        <h2 class="mb-4" style="font-weight: 600; color: #fff;">CCS Sit-In Monitoring System</h2>
+        <p class="mb-3" style="color: #e3f2fd;">Don't have an account?</p>
+        <a href="{{ url_for('auth.register') }}" class="btn btn-outline" style="border-color: #fff;">Register Now</a>
       </div>
-      <div class="form-group">
-        <label for="password">Password</label>
-        <input type="password" id="password" name="password" class="form-control" required
-               minlength="6" placeholder="Enter your password">
-      </div>
-      <div class="form-check remember-me">
-        <input class="form-check-input" type="checkbox" id="remember" name="remember">
-        <label class="form-check-label" for="remember">Remember Me</label>
-      </div>
-      <button type="submit" class="btn btn-gradient">Sign In</button>
-      <div class="forgot-password">
-        <a href="/forgot-password">Forgot Password?</a>
-      </div>
-    </form>
-  </div>
-  <div class="login-info">
-    <div>
-      <img src="{{ url_for('static', filename='images/css.png') }}" alt="Logo" class="login-logo">
-      <h3>CCS Sit-In Monitoring System</h3>&nbsp;&nbsp;
-      <p>Don't have an account?</p>
-      <a href="{{ url_for('auth.register') }}" class="btn btn-outline">Register</a>
+    </div>
+    <div class="login-form" style="padding: 2.5rem 2rem;">
+      <h2 class="text-center mb-4" style="color: #fff;">Sign In</h2>
+      <form method="POST" action="{{ url_for('auth.login') }}" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-group mb-3">
+          <label for="user_id" class="form-label">User ID</label>
+          <input type="text" id="user_id" name="user_id" class="form-control" required 
+                 minlength="3" maxlength="50" placeholder="Enter your user ID">
+        </div>
+        <div class="form-group mb-3">
+          <label for="password" class="form-label">Password</label>
+          <input type="password" id="password" name="password" class="form-control" required
+                 minlength="6" placeholder="Enter your password">
+        </div>
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" id="remember" name="remember">
+          <label class="form-check-label" for="remember">Remember Me</label>
+        </div>
+        <button type="submit" class="btn btn-gradient w-100 mb-3" style="background:#4A3599; color: #fff; border: none;">Sign In</button>
+        <div class="text-end">
+          <a href="/forgot-password" class="text-decoration-none" style="color: #4A3599;">Forgot Password?</a>
+        </div>
+      </form>
     </div>
   </div>
 </div>
+<style>
+  body {
+    background: #f4f8fb !important;
+  }
+  .auth-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 0;
+  }
+  .login-container {
+    display: flex;
+    max-width: 900px;
+    width: 100%;
+    overflow: hidden;
+  }
+  .login-info {
+    flex: 1 1 40%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1.5rem;
+    min-width: 260px;
+  }
+  .login-form {
+    flex: 1 1 60%;
+    background: #fff;
+    border-radius: 0 12px 12px 0;
+    box-shadow: none;
+  }
+  .form-control {
+    background: #f7fafc;
+    border: 1px solid #cfd8dc;
+    border-radius: 6px;
+    color: #2c3e50;
+    transition: border-color 0.2s;
+  }
+  .form-control:focus {
+    border-color: #4A3599;
+    background: #fff;
+    outline: none;
+    box-shadow: 0 0 0 2px #e3f2fd;
+  }
+  .btn-outline {
+    border: 2px solid #fff;
+    color: #fff;
+    background: transparent;
+    font-weight: 500;
+    transition: background 0.2s, color 0.2s;
+  }
+  .btn-outline:hover, .btn-outline:focus {
+    background: #fff;
+    color: #4A3599;
+  }
+  .form-label {
+    color: #4A3599;
+    font-weight: 500;
+  }
+</style>
 {% endblock %}
