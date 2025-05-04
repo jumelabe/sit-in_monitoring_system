@@ -888,8 +888,9 @@ def computer_control():
 
 @admin_bp.route('/bulk_update_computer_status', methods=['POST'])
 def bulk_update_computer_status():
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json
     if session.get('user_type') != 'admin':
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        if is_ajax:
             return jsonify({'success': False, 'message': 'Unauthorized'}), 401
         flash("Admin access required.", "danger")
         return redirect(url_for('auth.login'))
@@ -1053,125 +1054,109 @@ def bulk_update_computer_status():
 
 @admin_bp.route('/update_computer_status_route', methods=['POST'])
 def update_computer_status_route():
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json
     if session.get('user_type') != 'admin':
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        if is_ajax:
             return jsonify({'success': False, 'message': 'Unauthorized'}), 401
         return redirect(url_for('auth.login'))
-    
-    # Check if it's an AJAX request
-    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
-    
-    # Handle form data or JSON data
+
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json
     if request.is_json:
         data = request.get_json()
     else:
         data = request.form
-    
-    # Get basic parameters
+
     computer_id = data.get('computer_id')
     status = data.get('status')
     student_id = data.get('student_id')
-    
-    # Validate required parameters
+
     if not computer_id or not status:
         if is_ajax:
             return jsonify({'success': False, 'message': 'Missing parameters'}), 400
         flash('Missing parameters', 'danger')
         return redirect(url_for('admin.computer_control', lab=request.args.get('lab', '')))
-    
-    # Since we removed maintenance, only allow 'available' or 'in_use'
+
     if status not in ['available', 'in_use']:
-        status = 'available'  # Default to available for safety
-    
-    # If status is "in_use", student_id is required
+        status = 'available'
+
     if status == 'in_use' and not student_id:
         if is_ajax:
             return jsonify({'success': False, 'message': 'Student ID is required when marking a computer as in use'}), 400
         flash('Student ID is required when marking a computer as in use', 'danger')
         return redirect(url_for('admin.computer_control', lab=request.args.get('lab', '')))
-    
-    # Handle "in_use" status with student_id
+
     if status == 'in_use' and student_id:
-        # Check if student exists
         student = get_student_by_id(student_id)
         if not student:
             if is_ajax:
                 return jsonify({'success': False, 'message': 'Student not found. Please check the ID and try again.'}), 404
             flash('Student not found. Please check the ID and try again.', 'danger')
             return redirect(url_for('admin.computer_control', lab=request.args.get('lab', '')))
-        
         conn = get_connection()
         cursor = conn.cursor()
-        
         try:
-            # Check if the student ID exists in the sit_in_records with active session
             cursor.execute(
                 "SELECT COUNT(*) FROM sit_in_records WHERE id_number = ? AND logout_time IS NULL",
                 (student_id,)
             )
-            
             if cursor.fetchone()[0] == 0:
-                conn.close()
                 if is_ajax:
+                    conn.close()
                     return jsonify({'success': False, 'message': 'Student does not have an active sit-in session. They must start a sit-in session first.'}), 400
                 flash('Student does not have an active sit-in session. They must start a sit-in session first.', 'danger')
+                conn.close()
                 return redirect(url_for('admin.computer_control', lab=request.args.get('lab', '')))
-            
-            # Get computer info
             cursor.execute(
-                "SELECT status, lab_room, pc_number FROM computers WHERE id = ?", 
+                "SELECT status, lab_room, pc_number, student_id FROM computers WHERE id = ?", 
                 (computer_id,)
             )
             computer = cursor.fetchone()
             if not computer:
-                conn.close()
                 if is_ajax:
+                    conn.close()
                     return jsonify({'success': False, 'message': 'Computer not found. Please refresh and try again.'}), 404
                 flash('Computer not found. Please refresh and try again.', 'danger')
+                conn.close()
                 return redirect(url_for('admin.computer_control', lab=request.args.get('lab', '')))
-                
-            if computer['status'] == 'in_use':
-                # If the computer is already in use by someone else, show an error
-                cursor.execute(
-                    "SELECT student_id FROM computers WHERE id = ?",
-                    (computer_id,)
-                )
-                current_student = cursor.fetchone()
-                if current_student and current_student['student_id'] != student_id:
+            comp_status = computer['status'] if hasattr(computer, '__getitem__') and 'status' in computer.keys() else computer[0]
+            comp_student_id = computer['student_id'] if hasattr(computer, '__getitem__') and 'student_id' in computer.keys() else computer[3]
+            if comp_status == 'in_use' and comp_student_id and comp_student_id != student_id:
+                if is_ajax:
                     conn.close()
-                    if is_ajax:
-                        return jsonify({'success': False, 'message': 'This computer is already in use by another student. Please select another computer.'}), 400
-                    flash('This computer is already in use by another student. Please select another computer.', 'danger')
-                    return redirect(url_for('admin.computer_control', lab=request.args.get('lab', '')))
-            
-            # Update computer status - only mark as in use, don't create sit-in record
+                    return jsonify({'success': False, 'message': 'This computer is already in use by another student. Please select another computer.'}), 400
+                flash('This computer is already in use by another student. Please select another computer.', 'danger')
+                conn.close()
+                return redirect(url_for('admin.computer_control', lab=request.args.get('lab', '')))
             cursor.execute(
                 "UPDATE computers SET status = ?, student_id = ? WHERE id = ?",
                 (status, student_id, computer_id)
             )
-            
             conn.commit()
-            conn.close()
-            
             if is_ajax:
+                conn.close()
                 return jsonify({'success': True, 'message': 'Computer assigned to student successfully'})
-            
             flash('Computer assigned to student successfully!', 'success')
-            
         except Exception as e:
-            conn.rollback()
+            print(f"DEBUG: Exception in update_computer_status_route: {e}")
+            if 'conn' in locals():
+                conn.rollback()
+                conn.close()
             if is_ajax:
                 return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
             flash(f'Error: {str(e)}', 'danger')
-            
+            return redirect(url_for('admin.computer_control', lab=request.args.get('lab', '')))
         finally:
-            conn.close()
-        
+            if 'conn' in locals():
+                try:
+                    conn.close()
+                except:
+                    pass
+        if is_ajax:
+            return jsonify({'success': True, 'message': 'Computer assigned to student successfully'})
         return redirect(url_for('admin.computer_control', lab=request.args.get('lab', '')))
-    
+
     # Handle available status
     try:
-        # Update the computer to available and clear student_id
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute(
@@ -1179,17 +1164,26 @@ def update_computer_status_route():
             (status, computer_id)
         )
         conn.commit()
-        conn.close()
-        
         if is_ajax:
+            conn.close()
             return jsonify({'success': True, 'message': 'Computer status updated successfully'})
-        
         flash('Computer status updated successfully!', 'success')
     except Exception as e:
+        print(f"DEBUG: Exception in update_computer_status_route (available): {e}")
         if is_ajax:
+            if 'conn' in locals():
+                conn.close()
             return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
         flash(f'Error: {str(e)}', 'danger')
-    
+        return redirect(url_for('admin.computer_control', lab=request.args.get('lab', '')))
+    finally:
+        if 'conn' in locals():
+            try:
+                conn.close()
+            except:
+                pass
+    if is_ajax:
+        return jsonify({'success': True, 'message': 'Computer status updated successfully'})
     return redirect(url_for('admin.computer_control', lab=request.args.get('lab', '')))
 
 @admin_bp.route('/approve_reservation/<int:request_id>', methods=['POST'])

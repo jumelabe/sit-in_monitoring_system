@@ -112,7 +112,7 @@
         {% if history is defined and history %}
             {% for record in history %}
                 {% if not record.feedback and record.id is defined %}
-                <div class="modal fade feedback-modal" id="feedbackModal-{{ record.id }}" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
+                <div class="modal fade feedback-modal" id="feedbackModal-{{ record.id }}" tabindex="-1" aria-hidden="true">
                     <div class="modal-dialog modal-dialog-centered">
                         <div class="modal-content">
                             <div class="modal-header">
@@ -183,6 +183,48 @@
         border-radius: var(--radius-sm, 4px);
         border-left: 3px solid var(--primary, #4a3599);
     }
+
+    /* Modal fixes */
+    .modal {
+        z-index: 1050 !important;
+    }
+    
+    .modal-backdrop {
+        z-index: 1040 !important;
+    }
+    
+    .modal-dialog {
+        z-index: 1051 !important;
+        pointer-events: auto !important;
+    }
+    
+    .modal-content {
+        position: relative;
+        pointer-events: auto !important;
+    }
+    
+    .modal-content input,
+    .modal-content textarea,
+    .modal-content button {
+        pointer-events: auto !important;
+        position: relative;
+        z-index: 1052 !important;
+    }
+    
+    /* Ensure modal body has proper interactivity */
+    .modal-body, .modal-footer {
+        position: relative;
+        pointer-events: auto !important;
+    }
+    
+    /* Fix for modal stacking context */
+    .feedback-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+    }
 </style>
 
 <script>
@@ -208,5 +250,49 @@
             tr[i].style.display = visible ? '' : 'none';
         }
     }
+
+    // Fix modal interactivity issues
+    document.addEventListener('DOMContentLoaded', function() {
+        // Fix for modals to ensure they're interactive
+        const feedbackButtons = document.querySelectorAll('.feedback-btn');
+        feedbackButtons.forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                const modalId = button.getAttribute('data-bs-target');
+                const modal = document.querySelector(modalId);
+                
+                // Remove any existing backdrops
+                const existingBackdrops = document.querySelectorAll('.modal-backdrop');
+                existingBackdrops.forEach(backdrop => backdrop.remove());
+                
+                // Reset modal styles
+                document.body.classList.remove('modal-open');
+                document.body.style.overflow = '';
+                document.body.style.paddingRight = '';
+                
+                // Show the modal
+                const bsModal = new bootstrap.Modal(modal);
+                bsModal.show();
+                
+                // Make sure body has modal-open class
+                document.body.classList.add('modal-open');
+            });
+        });
+        
+        // Handle modal hidden events to ensure proper cleanup
+        const modals = document.querySelectorAll('.feedback-modal');
+        modals.forEach(modal => {
+            modal.addEventListener('hidden.bs.modal', function() {
+                // Ensure any leftover backdrop is removed
+                const backdrop = document.querySelector('.modal-backdrop');
+                if (backdrop) {
+                    backdrop.remove();
+                }
+                document.body.classList.remove('modal-open');
+                document.body.style.overflow = '';
+                document.body.style.paddingRight = '';
+            });
+        });
+    });
 </script>
 {% endblock %}

@@ -154,7 +154,7 @@
                                             <i class="fas fa-check-circle"></i> Available
                                         </button>
                                         
-                                        <button type="button" class="status-btn in-use w-100 mb-1" data-bs-toggle="modal" data-bs-target="#assignStudentModal" onclick="setComputerForAssignment('{{ computer.id }}')">
+                                        <button type="button" class="status-btn in-use w-100 mb-1" data-bs-toggle="modal" data-bs-target="#assignStudentModal" data-computer-id="{{ computer.id }}">
                                             <i class="fas fa-user"></i> Mark In Use
                                         </button>
                                     </div>
@@ -334,7 +334,80 @@
 </div>
 
 <!-- Add status notification div -->
-<div id="statusNotification" class="position-fixed top-0 end-0 p-3" style="z-index: 9999;"></div>
+<div id="statusNotification" class="position-fixed top-0 end-0 p-3" style="z-index: 9999; max-width: 350px;"></div>
+
+<!-- Add CSS for improved notifications -->
+<style>
+/* Improved notifications */
+.toast {
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    opacity: 0.95;
+    backdrop-filter: blur(4px);
+    min-width: 300px;
+}
+
+.toast.bg-success {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%) !important;
+}
+
+.toast.bg-danger {
+    background: linear-gradient(135deg, #dc3545 0%, #e74c3c 100%) !important;
+}
+
+.toast.bg-info {
+    background: linear-gradient(135deg, #0d6efd 0%, #17a2b8 100%) !important;
+}
+
+.toast-body {
+    padding: 1rem;
+    font-weight: 500;
+}
+
+.btn-close-white {
+    filter: brightness(0) invert(1);
+    opacity: 0.8;
+}
+</style>
+
+<!-- Function to display notifications -->
+<script>
+// Function to display notifications
+function showNotification(title, message, type) {
+    const notification = document.createElement('div');
+    notification.className = `toast align-items-center text-white bg-${type} border-0`;
+    notification.setAttribute('role', 'alert');
+    notification.setAttribute('aria-live', 'assertive');
+    notification.setAttribute('aria-atomic', 'true');
+    
+    notification.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">
+                <strong>${title}:</strong> ${message}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    `;
+    
+    // Clear any existing notifications
+    const container = document.getElementById('statusNotification');
+    container.innerHTML = '';
+    container.appendChild(notification);
+    
+    const toast = new bootstrap.Toast(notification, {
+        animation: true,
+        autohide: true,
+        delay: 4000
+    });
+    
+    toast.show();
+    
+    // Remove the notification after it's hidden
+    notification.addEventListener('hidden.bs.toast', function() {
+        notification.remove();
+    });
+}
+</script>
 
 <!-- Assign Student Modal -->
 <div class="modal fade" id="assignStudentModal" tabindex="-1" aria-labelledby="assignStudentModalLabel" aria-hidden="true">
@@ -1684,11 +1757,31 @@
 <script>
 // When the DOM is fully loaded
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialize the modal
+    const assignStudentModal = document.getElementById('assignStudentModal');
+    if (assignStudentModal) {
+        assignStudentModal.addEventListener('show.bs.modal', function(event) {
+            // Get the button that triggered the modal
+            const button = event.relatedTarget;
+            if (button) {
+                // Extract computer id from button's data attribute
+                const computerId = button.getAttribute('data-computer-id');
+                console.log('Modal triggered with computer ID:', computerId);
+                
+                // Set computer ID in the hidden field
+                const computerIdField = document.getElementById('modal-computer-id');
+                if (computerIdField) {
+                    computerIdField.value = computerId;
+                }
+            }
+        });
+    }
+    
     // Handle "Mark In Use" button clicks to set the computer ID in the modal
     document.querySelectorAll('.status-btn.in-use').forEach(button => {
         button.addEventListener('click', function() {
             const computerId = this.getAttribute('data-computer-id');
-            document.getElementById('modal-computer-id').value = computerId;
+            console.log('Mark In Use button clicked for computer ID:', computerId);
         });
     });
     
@@ -1784,7 +1877,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Function to set computer for assignment in modal
 function setComputerForAssignment(computerId) {
-    document.getElementById('modal-computer-id').value = computerId;
+    const computerIdField = document.getElementById('modal-computer-id');
+    if (computerIdField) {
+        computerIdField.value = computerId;
+        console.log('Setting computer ID in modal to:', computerId);
+    } else {
+        console.error('Computer ID field not found in modal!');
+    }
 }
 
 // Function to update computer status without page refresh
@@ -1799,7 +1898,6 @@ function updateComputerStatus(button, status) {
     fetch('{{ url_for("admin.update_computer_status_route") }}', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
             'X-Requested-With': 'XMLHttpRequest'
         },
         body: new URLSearchParams({
@@ -1916,76 +2014,54 @@ function submitBulkAction() {
 function handleBulkInUse() {
     const checkedBoxes = document.querySelectorAll('.computer-checkbox:checked');
     if (checkedBoxes.length === 0) {
-        alert('Please select at least one computer');
+        showNotification('Error', 'Please select at least one computer', 'danger');
         return;
     }
     
-    const totalComputers = document.querySelectorAll('.computer-checkbox').length;
     const computerIds = Array.from(checkedBoxes).map(checkbox => checkbox.getAttribute('data-computer-id'));
-    
     console.log('Handling bulk in-use for computers:', computerIds);
     
-    // If ALL computers are selected, treat as class use
-    if (checkedBoxes.length === totalComputers) {
-        console.log('All computers selected - treating as class use');
-        
-        // Create a simple direct form submit instead of AJAX
-        const tempForm = document.createElement('form');
-        tempForm.method = 'POST';
-        tempForm.action = '{{ url_for("admin.bulk_update_computer_status") }}';
-        tempForm.style.display = 'none';
-        
-        // Add CSRF token
-        const csrfInput = document.createElement('input');
-        csrfInput.type = 'hidden';
-        csrfInput.name = 'csrf_token';
-        csrfInput.value = document.querySelector('input[name="csrf_token"]').value;
-        tempForm.appendChild(csrfInput);
-        
-        // Add status and usage type
-        const statusInput = document.createElement('input');
-        statusInput.type = 'hidden';
-        statusInput.name = 'status';
-        statusInput.value = 'in_use';
-        tempForm.appendChild(statusInput);
-        
-        const usageTypeInput = document.createElement('input');
-        usageTypeInput.type = 'hidden';
-        usageTypeInput.name = 'usage_type';
-        usageTypeInput.value = 'class';
-        tempForm.appendChild(usageTypeInput);
-        
-        // Add computer IDs
-        computerIds.forEach(id => {
-            const idInput = document.createElement('input');
-            idInput.type = 'hidden';
-            idInput.name = 'computer_ids[]';
-            idInput.value = id;
-            tempForm.appendChild(idInput);
-        });
-        
-        // Add form to body and submit
-        document.body.appendChild(tempForm);
-        tempForm.submit();
-    } else {
-        // For individual selections, show the modal as before
-        const container = document.getElementById('bulkAssignComputerIds');
-        container.innerHTML = '';
-        
-        checkedBoxes.forEach(checkbox => {
-            const computerId = checkbox.getAttribute('data-computer-id');
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = 'computer_ids[]';
-            input.value = computerId;
-            container.appendChild(input);
-        });
-        
-        // Open the modal
-        const modal = document.getElementById('bulkAssignStudentModal');
-        const bulkAssignModal = new bootstrap.Modal(modal);
-        bulkAssignModal.show();
-    }
+    // Always treat bulk actions as class use, no student ID needed
+    showNotification('Info', 'Marking selected computers as in-use for class', 'info');
+    
+    // Create a simple direct form submit
+    const tempForm = document.createElement('form');
+    tempForm.method = 'POST';
+    tempForm.action = '{{ url_for("admin.bulk_update_computer_status") }}';
+    tempForm.style.display = 'none';
+    
+    // Add CSRF token
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrf_token';
+    csrfInput.value = document.querySelector('input[name="csrf_token"]').value;
+    tempForm.appendChild(csrfInput);
+    
+    // Add status and usage type
+    const statusInput = document.createElement('input');
+    statusInput.type = 'hidden';
+    statusInput.name = 'status';
+    statusInput.value = 'in_use';
+    tempForm.appendChild(statusInput);
+    
+    const usageTypeInput = document.createElement('input');
+    usageTypeInput.type = 'hidden';
+    usageTypeInput.name = 'usage_type';
+    usageTypeInput.value = 'class';
+    tempForm.appendChild(usageTypeInput);
+    
+    // Add computer IDs
+    computerIds.forEach(id => {
+        const idInput = document.createElement('input');
+        idInput.type = 'hidden';
+        idInput.name = 'computer_ids[]';
+        idInput.value = id;
+        tempForm.appendChild(idInput);
+    });
+    
+    // Add form to body and submit
+    document.body.appendChild(tempForm);
+    tempForm.submit();
 }
 
 // Function to display notifications
@@ -2005,12 +2081,15 @@ function showNotification(title, message, type) {
         </div>
     `;
     
-    document.getElementById('statusNotification').appendChild(notification);
+    // Clear any existing notifications
+    const container = document.getElementById('statusNotification');
+    container.innerHTML = '';
+    container.appendChild(notification);
     
     const toast = new bootstrap.Toast(notification, {
         animation: true,
         autohide: true,
-        delay: 3000
+        delay: 4000
     });
     
     toast.show();
@@ -2025,15 +2104,30 @@ function showNotification(title, message, type) {
 document.addEventListener('DOMContentLoaded', function() {
     const assignStudentForm = document.querySelector('#assignStudentModal form');
     if (assignStudentForm) {
+        // Display the computer ID in the form to debug
+        assignStudentForm.addEventListener('show.bs.modal', function() {
+            console.log('Modal shown with computer ID:', document.getElementById('modal-computer-id').value);
+        });
+        
         assignStudentForm.addEventListener('submit', function(event) {
             event.preventDefault();
             
-            const formData = new FormData(assignStudentForm);
-            const computerId = formData.get('computer_id');
-            const studentId = formData.get('student_id');
+            // Get the computer ID directly from the hidden input field
+            const computerId = document.getElementById('modal-computer-id').value;
+            const studentId = document.getElementById('student-id').value;
+            const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+            
+            // Debug form values
+            console.log('Submitting with computer_id:', computerId);
+            console.log('Student ID:', studentId);
+            
+            if (!computerId || computerId === '') {
+                showNotification('Error', 'Computer ID is missing', 'danger');
+                return;
+            }
             
             if (!studentId) {
-                alert('Please enter a student ID');
+                showNotification('Error', 'Please enter a student ID', 'danger');
                 return;
             }
             
@@ -2041,9 +2135,20 @@ document.addEventListener('DOMContentLoaded', function() {
             submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
             submitBtn.disabled = true;
             
+            // Use URLSearchParams instead of FormData for more reliable parameter passing
+            const params = new URLSearchParams();
+            params.append('csrf_token', csrfToken);
+            params.append('computer_id', computerId);
+            params.append('student_id', studentId);
+            params.append('status', 'in_use');
+            
             fetch('{{ url_for("admin.update_computer_status_route") }}', {
                 method: 'POST',
-                body: formData
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: params
             })
             .then(response => response.json())
             .then(data => {
@@ -2078,6 +2183,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     const modal = bootstrap.Modal.getInstance(document.getElementById('assignStudentModal'));
                     modal.hide();
                     
+                    // Explicitly remove modal backdrop after a short delay
+                    setTimeout(() => {
+                        const backdrop = document.querySelector('.modal-backdrop');
+                        if (backdrop) {
+                            backdrop.remove();
+                        }
+                        document.body.classList.remove('modal-open');
+                        document.body.style.overflow = '';
+                        document.body.style.paddingRight = '';
+                    }, 300);
+                    
                     // Reset form
                     assignStudentForm.reset();
                     
@@ -2100,91 +2216,166 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Modify bulk assign form
-    const bulkAssignForm = document.getElementById('bulkAssignForm');
-    if (bulkAssignForm) {
-        bulkAssignForm.addEventListener('submit', function(event) {
-            event.preventDefault();
-            
-            const formData = new FormData(bulkAssignForm);
-            const submitBtn = bulkAssignForm.querySelector('button[type="submit"]');
-            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-            submitBtn.disabled = true;
-            
-            // Get computer IDs
-            const computerIds = [];
-            document.querySelectorAll('#bulkAssignComputerIds input').forEach(input => {
-                computerIds.push(input.value);
-            });
-            
-            fetch('{{ url_for("admin.bulk_update_computer_status") }}', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Update UI for each computer
-                    computerIds.forEach(computerId => {
-                        const computerCard = document.getElementById('computer-' + computerId);
-                        
-                        // Remove previous status classes
-                        computerCard.classList.remove('available', 'in_use', 'maintenance');
-                        
-                        // Add in_use class
-                        computerCard.classList.add('in_use');
-                        
-                        // Update status badge
-                        const statusBadge = computerCard.querySelector('.status-badge');
-                        statusBadge.className = 'status-badge badge bg-danger';
-                        statusBadge.textContent = 'In Use';
-                        
-                        // Add student info
-                        const computerBody = computerCard.querySelector('.computer-body');
-                        let studentInfo = computerCard.querySelector('.student-info');
-                        
-                        if (!studentInfo) {
-                            studentInfo = document.createElement('div');
-                            studentInfo.className = 'student-info';
-                            computerBody.appendChild(studentInfo);
-                        }
-                        
-                        studentInfo.innerHTML = `<span>User: ${formData.get('student_id')}</span>`;
-                        
-                        // Uncheck the checkbox
-                        const checkbox = computerCard.querySelector('.computer-checkbox');
-                        checkbox.checked = false;
-                        computerCard.classList.remove('selected');
-                    });
-                    
-                    // Update selection count
-                    updateSelectionCount();
-                    
-                    // Close modal
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('bulkAssignStudentModal'));
-                    modal.hide();
-                    
-                    // Reset form
-                    bulkAssignForm.reset();
-                    
-                    // Show notification
-                    showNotification('Success', 'Computers assigned to student successfully', 'success');
-                } else {
-                    // Show error notification
-                    showNotification('Error', data.message || 'Failed to assign computers to student', 'danger');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                showNotification('Error', 'An unexpected error occurred', 'danger');
-            })
-            .finally(() => {
-                // Restore button text
-                submitBtn.innerHTML = '<i class="fas fa-check"></i> Assign Student';
-                submitBtn.disabled = false;
-            });
+    // Add a listener to modal hidden event to ensure cleanup
+    const assignStudentModal = document.getElementById('assignStudentModal');
+    if (assignStudentModal) {
+        assignStudentModal.addEventListener('hidden.bs.modal', function() {
+            // Ensure any leftover backdrop is removed
+            const backdrop = document.querySelector('.modal-backdrop');
+            if (backdrop) {
+                backdrop.remove();
+            }
+            document.body.classList.remove('modal-open');
+            document.body.style.overflow = '';
+            document.body.style.paddingRight = '';
         });
     }
 });
+
+// Add a listener to modal hidden event to ensure cleanup
+const bulkAssignStudentModal = document.getElementById('bulkAssignStudentModal');
+if (bulkAssignStudentModal) {
+    bulkAssignStudentModal.addEventListener('hidden.bs.modal', function() {
+        // Ensure any leftover backdrop is removed
+        const backdrop = document.querySelector('.modal-backdrop');
+        if (backdrop) {
+            backdrop.remove();
+        }
+        document.body.classList.remove('modal-open');
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = '';
+    });
+}
+
+// Modify bulk assign form
+const bulkAssignForm = document.getElementById('bulkAssignForm');
+if (bulkAssignForm) {
+    bulkAssignForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        
+        const formData = new FormData(bulkAssignForm);
+        const studentId = formData.get('student_id');
+        const csrfToken = formData.get('csrf_token');
+        
+        if (!studentId) {
+            showNotification('Error', 'Please enter a student ID', 'danger');
+            return;
+        }
+        
+        const submitBtn = bulkAssignForm.querySelector('button[type="submit"]');
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+        submitBtn.disabled = true;
+        
+        // Get computer IDs
+        const computerIds = [];
+        document.querySelectorAll('#bulkAssignComputerIds input').forEach(input => {
+            computerIds.push(input.value);
+        });
+        
+        if (computerIds.length === 0) {
+            showNotification('Error', 'No computers selected', 'danger');
+            submitBtn.innerHTML = '<i class="fas fa-check"></i> Assign Student';
+            submitBtn.disabled = false;
+            return;
+        }
+        
+        console.log('Bulk assigning computers:', computerIds);
+        console.log('Student ID:', studentId);
+        
+        // Use URLSearchParams instead of FormData
+        const params = new URLSearchParams();
+        params.append('csrf_token', csrfToken);
+        params.append('student_id', studentId);
+        params.append('status', 'in_use');
+        params.append('usage_type', 'individual');
+        
+        // Add computer IDs
+        computerIds.forEach(id => {
+            params.append('computer_ids[]', id);
+        });
+        
+        fetch('{{ url_for("admin.bulk_update_computer_status") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: params
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update UI for each computer
+                computerIds.forEach(computerId => {
+                    const computerCard = document.getElementById('computer-' + computerId);
+                    
+                    // Remove previous status classes
+                    computerCard.classList.remove('available', 'in_use', 'maintenance');
+                    
+                    // Add in_use class
+                    computerCard.classList.add('in_use');
+                    
+                    // Update status badge
+                    const statusBadge = computerCard.querySelector('.status-badge');
+                    statusBadge.className = 'status-badge badge bg-danger';
+                    statusBadge.textContent = 'In Use';
+                    
+                    // Add student info
+                    const computerBody = computerCard.querySelector('.computer-body');
+                    let studentInfo = computerCard.querySelector('.student-info');
+                    
+                    if (!studentInfo) {
+                        studentInfo = document.createElement('div');
+                        studentInfo.className = 'student-info';
+                        computerBody.appendChild(studentInfo);
+                    }
+                    
+                    studentInfo.innerHTML = `<span>User: ${studentId}</span>`;
+                    
+                    // Uncheck the checkbox
+                    const checkbox = computerCard.querySelector('.computer-checkbox');
+                    checkbox.checked = false;
+                    computerCard.classList.remove('selected');
+                });
+                
+                // Update selection count
+                updateSelectionCount();
+                
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('bulkAssignStudentModal'));
+                modal.hide();
+                
+                // Explicitly remove modal backdrop after a short delay
+                setTimeout(() => {
+                    const backdrop = document.querySelector('.modal-backdrop');
+                    if (backdrop) {
+                        backdrop.remove();
+                    }
+                    document.body.classList.remove('modal-open');
+                    document.body.style.overflow = '';
+                    document.body.style.paddingRight = '';
+                }, 300);
+                
+                // Reset form
+                bulkAssignForm.reset();
+                
+                // Show notification
+                showNotification('Success', 'Computers assigned to student successfully', 'success');
+            } else {
+                // Show error notification
+                showNotification('Error', data.message || 'Failed to assign computers to student', 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showNotification('Error', 'An unexpected error occurred', 'danger');
+        })
+        .finally(() => {
+            // Restore button text
+            submitBtn.innerHTML = '<i class="fas fa-check"></i> Assign Student';
+            submitBtn.disabled = false;
+        });
+    });
+}
 </script>
 {% endblock %}

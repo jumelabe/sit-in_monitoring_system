@@ -17,7 +17,7 @@ def get_connection():
     try:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS sit_in_records (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                sit_in_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 id_number TEXT NOT NULL,
                 name TEXT NOT NULL,
                 purpose TEXT,
@@ -411,7 +411,7 @@ def get_sit_in_records():
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT sir.id_number, sir.name, sir.purpose, sir.lab,
+        SELECT sir.sit_in_id, sir.id_number, sir.name, sir.purpose, sir.lab,
                sir.login_time, 
                CASE 
                    WHEN sir.logout_time IS NULL THEN 'Active'
@@ -422,7 +422,7 @@ def get_sit_in_records():
     """)
     records = cursor.fetchall()
     conn.close()
-    return [dict(zip(['id_number', 'name', 'purpose', 'lab', 'login_time', 'logout_time'], record)) 
+    return [dict(zip(['sit_in_id', 'id_number', 'name', 'purpose', 'lab', 'login_time', 'logout_time'], record)) 
             for record in records]
 
 def get_reports():

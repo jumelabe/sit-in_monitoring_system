@@ -176,7 +176,8 @@ def reserve():
             return render_template('reservation.html',
                                  id_number=student['idno'],
                                  student_name=f"{student['firstname']} {student['lastname']}",
-                                 remaining_session=student['session_count'])
+                                 remaining_session=student['session_count'],
+                                 csrf_token=generate_csrf())
         
         # Create the reservation in the database
         try:
@@ -193,7 +194,8 @@ def reserve():
     return render_template('reservation.html',
                          id_number=student['idno'],
                          student_name=f"{student['firstname']} {student['lastname']}",
-                         remaining_session=student['session_count'])
+                         remaining_session=student['session_count'],
+                         csrf_token=generate_csrf())
 
 @student_bp.route('/submit-feedback', methods=['POST'])
 def submit_feedback():

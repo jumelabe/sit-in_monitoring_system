@@ -62,7 +62,7 @@
                             <div class="alert alert-success">{{ success_message }}</div>
                             {% endif %}
                             
-                            <form action="{{ url_for('student.reserve') }}" method="POST" class="form-container">
+                            <form id="reservation-form" action="{{ url_for('student.reserve') }}" method="POST" class="form-container">
                                 {% if csrf_token is defined %}
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token if csrf_token is callable else csrf_token }}">
                                 {% endif %}
@@ -241,12 +241,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const availableComputersGrid = document.getElementById('available-computers-grid');
     let selectedComputer = null;
 
-    // Add a hidden input to store the selected computer
-    const computerInput = document.createElement('input');
-    computerInput.type = 'hidden';
-    computerInput.name = 'selected_computer';
-    computerInput.id = 'selected_computer';
-    document.querySelector('form').appendChild(computerInput);
+    // Select the reservation form by id
+    const reservationForm = document.getElementById('reservation-form');
+    // Only add the hidden input if it doesn't already exist
+    let computerInput = document.getElementById('selected_computer');
+    if (!computerInput) {
+        computerInput = document.createElement('input');
+        computerInput.type = 'hidden';
+        computerInput.name = 'selected_computer';
+        computerInput.id = 'selected_computer';
+        reservationForm.appendChild(computerInput);
+    }
 
     // Set min date to today for the date input
     const dateInput = document.getElementById('date');
