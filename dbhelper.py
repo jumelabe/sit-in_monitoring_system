@@ -492,6 +492,34 @@ def get_filtered_reports(selected_lab='', selected_purpose=''):
     # Format the results
     reports = []
     for row in rows:
+        # Format duration for better readability in reports
+        duration = row[6]
+        if duration != 'Active' and 'hours' in duration:
+            try:
+                hours = float(duration.replace(' hours', ''))
+                if hours < 1:
+                    # Convert to minutes for short durations
+                    minutes = round(hours * 60)
+                    duration = f"{minutes} minutes"
+                elif hours >= 24:
+                    # Format days for long durations
+                    days = int(hours / 24)
+                    remaining_hours = round(hours % 24, 1)
+                    if remaining_hours > 0:
+                        duration = f"{days} days, {remaining_hours} hours"
+                    else:
+                        duration = f"{days} days"
+                else:
+                    # Format hours with better precision
+                    hours_int = int(hours)
+                    minutes = int((hours - hours_int) * 60)
+                    if minutes > 0:
+                        duration = f"{hours_int} hours, {minutes} minutes"
+                    else:
+                        duration = f"{hours_int} hours"
+            except (ValueError, TypeError):
+                pass  # Keep original duration if parsing fails
+                
         reports.append({
             'id_number': row[0],
             'name': row[1],
@@ -499,7 +527,7 @@ def get_filtered_reports(selected_lab='', selected_purpose=''):
             'lab': row[3],
             'login_time': row[4],
             'logout_time': row[5],
-            'duration': row[6],
+            'duration': duration,
             'date': row[7]
         })
     

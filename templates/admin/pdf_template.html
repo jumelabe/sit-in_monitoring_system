@@ -3,32 +3,89 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        body { font-family: Arial, sans-serif; }
-        .header { text-align: center; margin-bottom: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th { background-color: #4A3599; color: white; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
-        tr:nth-child(even) { background-color: #f9f9f9; }
+        @page {
+            size: letter portrait;
+            margin: 1cm;
+        }
+        body { 
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0; 
+            background-color: white;
+        }
+        .header {
+            width: 100%;
+            padding-top: 20px;
+            padding-bottom: 10px;
+            text-align: center;
+        }
+        .university-name {
+            color: #5E3E9C;
+            font-size: 22px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .college-name {
+            color: #444;
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .report-name {
+            color: #666;
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th { 
+            background-color: #473080; 
+            color: white;
+            padding: 8px 6px;
+            text-align: left;
+            font-size: 14px;
+            font-weight: normal;
+            border: 1px solid #473080;
+        }
+        td { 
+            padding: 8px 6px;
+            text-align: left; 
+            font-size: 13px;
+            border: 1px solid #ddd;
+        }
+        tr:nth-child(even) { 
+            background-color: #f9f9f9; 
+        }
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 11px;
+            color: #666;
+            padding-top: 10px;
+        }
     </style>
 </head>
 <body>
     <div class="header">
-        <h2>University of Cebu - Main Campus</h2>
-        <h3>College of Computer Studies</h3>
-        <h4>Sit-In Monitoring System Report</h4>
-        <p>Generated on: {{ timestamp }}</p>
+        <div class="university-name">University of Cebu - Main Campus</div>
+        <div class="college-name">College of Computer Studies</div>
+        <div class="report-name">Computer Laboratory Sit-In Monitoring System Report</div>
     </div>
-    <table>
+    
+    <table cellspacing="0" cellpadding="6">
         <thead>
             <tr>
-                <th>ID Number</th>
-                <th>Name</th>
-                <th>Purpose</th>
-                <th>Laboratory</th>
-                <th>Login Time</th>
-                <th>Logout Time</th>
-                <th>Duration</th>
-                <th>Date</th>
+                <th>id_number</th>
+                <th>name</th>
+                <th>purpose</th>
+                <th>lab</th>
+                <th>login_time</th>
+                <th>logout_time</th>
+                <th>duration</th>
+                <th>date</th>
             </tr>
         </thead>
         <tbody>
@@ -46,5 +103,9 @@
             {% endfor %}
         </tbody>
     </table>
+    
+    <div class="footer">
+        <p>© {{ timestamp.split('-')[0] }} University of Cebu - College of Computer Studies | Sit-In Monitoring System</p>
+    </div>
 </body>
 </html>

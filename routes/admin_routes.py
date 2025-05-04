@@ -403,67 +403,170 @@ def export_reports(format):
         df = pd.DataFrame(result['reports'])
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
+        # Define file name with meaningful context
+        file_prefix = 'sit_in_reports'
+        if lab:
+            file_prefix += f'_lab_{lab}'
+        if purpose:
+            file_prefix += f'_{purpose}'
+        filename = f"{file_prefix}_{timestamp}"
+        
         if format.lower() == 'csv':
             output = BytesIO()
-            df.to_csv(output, index=False, encoding='utf-8-sig')
+            # Add UTF-8 BOM for Excel compatibility with special characters
+            output.write(b'\xef\xbb\xbf')
+            
+            # Format columns for better readability
+            for col in ['login_time', 'logout_time', 'date']:
+                if col in df.columns:
+                    df[col] = pd.to_datetime(df[col], errors='coerce').dt.strftime('%Y-%m-%d %H:%M:%S')
+            
+            df.to_csv(output, index=False, encoding='utf-8')
             output.seek(0)
             
             return send_file(
                 output,
                 mimetype='text/csv',
                 as_attachment=True,
-                download_name=f'sit_in_reports_{timestamp}.csv'
+                download_name=f'{filename}.csv'
             )
 
         elif format.lower() == 'excel':
-            output = BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df.to_excel(writer, index=False, sheet_name='Reports')
-                worksheet = writer.sheets['Reports']
+            try:
+                # Create a simple Excel file without fancy formatting
+                output = BytesIO()
                 
-                # Auto-adjust column widths
-                for idx, col in enumerate(df.columns):
-                    series = df[col]
-                    max_len = max(
-                        series.astype(str).map(len).max(),
-                        len(str(col))
-                    ) + 2
-                    worksheet.set_column(idx, idx, max_len)
-            
-            output.seek(0)
-            
-            return send_file(
-                output,
-                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                as_attachment=True,
-                download_name=f'sit_in_reports_{timestamp}.xlsx'
-            )
+                # Use the simplest possible Excel export
+                df.to_excel(output, index=False, sheet_name='Sit-In Reports')
+                output.seek(0)
+                
+                return send_file(
+                    output,
+                    mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    as_attachment=True,
+                    download_name=f'{filename}.xlsx'
+                )
+            except Exception as e:
+                print(f"Excel export error: {str(e)}")
+                # Fall back to CSV if Excel fails
+                output = BytesIO()
+                output.write(b'\xef\xbb\xbf')  # UTF-8 BOM
+                df.to_csv(output, index=False, encoding='utf-8')
+                output.seek(0)
+                
+                return send_file(
+                    output,
+                    mimetype='text/csv',
+                    as_attachment=True,
+                    download_name=f'{filename}.csv'
+                )
 
         elif format.lower() == 'pdf':
+            # Try multiple possible paths for the logo files
+            app_root = os.path.dirname(os.path.abspath(__file__))
+            project_root = os.path.dirname(app_root)
+            
+            # Try different possible filenames and locations
+            possible_uc_logos = [
+                os.path.join(project_root, 'static', 'images', 'uc_logo.jpg'),
+                os.path.join(project_root, 'static', 'images', 'uc.logo.jpg'),
+                os.path.join(project_root, 'static', 'images', 'uc-logo.jpg')
+            ]
+            
+            possible_css_logos = [
+                os.path.join(project_root, 'static', 'images', 'css.png'),
+                os.path.join(project_root, 'static', 'images', 'css_logo.png'),
+                os.path.join(project_root, 'static', 'images', 'css-logo.png')
+            ]
+            
+            # Find the first existing logo file
+            uc_logo_path = None
+            for path in possible_uc_logos:
+                if os.path.exists(path):
+                    uc_logo_path = path
+                    break
+                    
+            css_logo_path = None
+            for path in possible_css_logos:
+                if os.path.exists(path):
+                    css_logo_path = path
+                    break
+            
+            # Debug information
+            print(f"Project root: {project_root}")
+            print(f"UC logo path: {uc_logo_path}")
+            print(f"CSS logo path: {css_logo_path}")
+            
+            # Convert images to base64 for embedding in HTML
+            import base64
+            uc_logo_b64 = ""
+            css_logo_b64 = ""
+            
+            # Try to read UC logo
+            if uc_logo_path:
+                try:
+                    with open(uc_logo_path, "rb") as img_file:
+                        uc_logo_b64 = base64.b64encode(img_file.read()).decode('utf-8')
+                        print(f"Successfully encoded UC logo")
+                except Exception as e:
+                    print(f"Error encoding UC logo: {str(e)}")
+            else:
+                print("UC logo file not found")
+                
+            # Try to read CSS logo
+            if css_logo_path:
+                try:
+                    with open(css_logo_path, "rb") as img_file:
+                        css_logo_b64 = base64.b64encode(img_file.read()).decode('utf-8')
+                        print(f"Successfully encoded CSS logo")
+                except Exception as e:
+                    print(f"Error encoding CSS logo: {str(e)}")
+            else:
+                print("CSS logo file not found")
+            
+            # Prepare data for PDF template
+            html_context = {
+                'reports': df.to_dict('records'),
+                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'lab': lab,
+                'purpose': purpose,
+                'uc_logo_b64': uc_logo_b64,
+                'css_logo_b64': css_logo_b64
+            }
+            
+            # Render the template with complete context
             html_string = render_template(
                 'admin/pdf_template.html',
-                reports=df.to_dict('records'),
-                timestamp=timestamp
+                **html_context
             )
             
+            # Create PDF
             output = BytesIO()
-            pisa.CreatePDF(
+            
+            # Create PDF with pisa
+            pisa_status = pisa.CreatePDF(
                 html_string,
-                dest=output,
-                encoding='utf-8'
+                dest=output
             )
+            
+            if pisa_status.err:
+                print(f"PDF generation error: {pisa_status.err}")
+                return jsonify({'error': 'PDF generation failed'}), 500
+                
             output.seek(0)
             
             return send_file(
                 output,
                 mimetype='application/pdf',
                 as_attachment=True,
-                download_name=f'sit_in_reports_{timestamp}.pdf'
+                download_name=f'{filename}.pdf'
             )
 
         return jsonify({'error': 'Invalid format specified'}), 400
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         print(f"Export error: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
