@@ -5,7 +5,7 @@
 {% block content %}
 <div class="dashboard-container">
     <div class="sidebar">
-        <h1 class="dashboard-title">View Feedback</h1>
+        <h1 class="dashboard-title">Feedbacks</h1>
         <a href="{{ url_for('admin.admin_dashboard') }}" class="menu-btn">Dashboard</a>
         <a href="{{ url_for('admin.student_list') }}" class="menu-btn">Student List</a>
         <a href="{{ url_for('admin.current_sit_in') }}" class="menu-btn">Current Sit-in</a>
@@ -26,17 +26,10 @@
                     <div class="filter-section">
                         <form id="filterForm" class="row g-3">
                             <div class="col-md-10">
-                                <label class="form-label">Laboratory</label>
-                                <select class="custom-select" name="lab" id="labFilter">
-                                    <option value="">All Laboratories</option>
-                                    {% for lab in laboratories %}
-                                    <option value="{{ lab }}" {% if lab == selected_lab %}selected{% endif %}>{{ lab }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-2 d-flex align-items-end">
-                                    <i class="fas fa-filter"></i> Filter
-                                </button>
+                                <div class="search-container">
+                                    <input type="text" id="searchInput" class="form-control search-input" placeholder="Search feedback reports...">
+                                    <i class="fas fa-search search-icon"></i>
+                                </div>
                             </div>
                         </form>
                     </div>
@@ -55,7 +48,7 @@ function debug(message, data) {
     console.log(message, data);
 }
 
-document.getElementById('labFilter').addEventListener('change', function(e) {
+document.getElementById('searchInput').addEventListener('input', function(e) {
     filterFeedbacks();
 });
 
@@ -65,11 +58,11 @@ document.getElementById('filterForm').addEventListener('submit', function(e) {
 });
 
 function filterFeedbacks() {
-    const lab = document.getElementById('labFilter').value;
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
     const url = new URL(window.location.href);
-    url.searchParams.set('lab', lab);
+    url.searchParams.set('search', searchTerm);
     
-    debug('Filtering for lab:', lab);
+    debug('Searching for:', searchTerm);
 
     fetch(url, {
         headers: {
@@ -84,11 +77,21 @@ function filterFeedbacks() {
         grid.innerHTML = '';
         
         if (!data.feedbacks || data.feedbacks.length === 0) {
-            grid.innerHTML = '<div class="alert alert-info">No feedback reports available for this laboratory.</div>';
+            grid.innerHTML = '<div class="alert alert-info">No feedback reports found matching your search.</div>';
             return;
         }
         
-        data.feedbacks.forEach(feedback => {
+        const filteredFeedbacks = data.feedbacks.filter(feedback => {
+            const searchString = `${feedback.name} ${feedback.id_number} ${feedback.laboratory} ${feedback.sit_purpose} ${feedback.feedback}`.toLowerCase();
+            return searchString.includes(searchTerm);
+        });
+        
+        if (filteredFeedbacks.length === 0) {
+            grid.innerHTML = '<div class="alert alert-info">No feedback reports found matching your search.</div>';
+            return;
+        }
+        
+        filteredFeedbacks.forEach(feedback => {
             grid.innerHTML += `
                 <div class="feedback-card">
                     <div class="feedback-header">
@@ -249,6 +252,75 @@ window.addEventListener('DOMContentLoaded', filterFeedbacks);
     .feedback-meta {
         color: #718096;
         font-size: 0.85rem;
+    }
+    
+    .filter-btn {
+        background: linear-gradient(90deg, #4a3599 0%, #6647b8 100%);
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        padding: 0.5rem 1.2rem;
+        font-size: 1rem;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: background 0.2s, box-shadow 0.2s;
+        box-shadow: 0 2px 8px rgba(76, 61, 143, 0.08);
+    }
+    .filter-btn:hover, .filter-btn:focus {
+        background: linear-gradient(90deg, #6647b8 0%, #4a3599 100%);
+        color: #fff;
+        outline: none;
+        box-shadow: 0 4px 16px rgba(76, 61, 143, 0.15);
+    }
+    
+    .search-container {
+        position: relative;
+        width: 100%;
+    }
+
+    .search-input {
+        padding: 10px 40px 10px 15px;
+        border-radius: 6px;
+        border: 1px solid #ddd;
+        font-size: 1rem;
+        width: 100%;
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .search-input:focus {
+        border-color: #4a3599;
+        box-shadow: 0 0 0 2px rgba(74, 53, 153, 0.1);
+        outline: none;
+    }
+
+    .search-icon {
+        position: absolute;
+        right: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #6647b8;
+    }
+
+    .search-btn {
+        background: linear-gradient(90deg, #4a3599 0%, #6647b8 100%);
+        color: #fff;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-size: 1rem;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all 0.2s;
+    }
+
+    .search-btn:hover {
+        background: linear-gradient(90deg, #6647b8 0%, #4a3599 100%);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(74, 53, 153, 0.15);
     }
     
     @media (max-width: 768px) {

@@ -510,12 +510,40 @@ h4 { font-size: var(--h4-size); }
 }
 
 .alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   position: relative;
-  padding: var(--space-md);
+  padding: 1rem 1.5rem 1rem 1.25rem;
   margin-bottom: var(--space-md);
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-md);
+  font-size: 1.08rem;
+  min-width: 220px;
+  max-width: 350px;
+  word-break: break-word;
+}
+
+.alert .btn-close {
+  margin-left: 18px;
+  margin-right: 0;
+  font-size: 1.3rem;
+  color: inherit;
+  opacity: 0.6;
+  background: none;
+  border: none;
+  padding: 0 2px;
+  line-height: 1;
+  cursor: pointer;
+  transition: opacity 0.2s, color 0.2s;
+  align-self: flex-start;
+}
+
+.alert .btn-close:hover {
+  opacity: 1;
+  color: #333;
 }
 
 .alert-success {

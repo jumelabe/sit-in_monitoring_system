@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <style>
         @page {
-            size: letter portrait;
-            margin: 1cm;
+            size: letter landscape;
+            margin: 1.5cm;
         }
         body { 
             font-family: Arial, sans-serif;
@@ -13,79 +13,143 @@
             padding: 0; 
             background-color: white;
         }
-        .header {
+        .header-container {
+            position: relative;
             width: 100%;
-            padding-top: 20px;
-            padding-bottom: 10px;
+            height: 100px;
+            margin-bottom: 20px;
+        }
+        .logo {
+            position: absolute;
+            height: 80px;
+            width: auto;
+        }
+        .logo-left {
+            left: 0;
+            top: 0;
+        }
+        .logo-right {
+            right: 0;
+            top: 0;
+        }
+        .header-text {
             text-align: center;
+            padding-top: 10px;
         }
         .university-name {
             color: #5E3E9C;
-            font-size: 22px;
+            font-size: 24px;
             font-weight: bold;
             margin-bottom: 5px;
         }
         .college-name {
             color: #444;
-            font-size: 18px;
+            font-size: 20px;
             font-weight: bold;
             margin-bottom: 5px;
         }
         .report-name {
             color: #666;
-            font-size: 16px;
+            font-size: 18px;
             margin-bottom: 20px;
+        }
+        .filter-info {
+            text-align: center;
+            margin: 10px 0;
+            font-size: 14px;
+            color: #666;
         }
         table { 
             width: 100%; 
             border-collapse: collapse;
-            margin-top: 10px;
+            margin-top: 20px;
+            table-layout: fixed;
         }
         th { 
             background-color: #473080; 
             color: white;
-            padding: 8px 6px;
+            padding: 10px 8px;
             text-align: left;
             font-size: 14px;
-            font-weight: normal;
+            font-weight: bold;
             border: 1px solid #473080;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
         td { 
-            padding: 8px 6px;
+            padding: 8px;
             text-align: left; 
-            font-size: 13px;
+            font-size: 12px;
             border: 1px solid #ddd;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            max-width: 200px;
         }
+        /* Column widths */
+        th:nth-child(1), td:nth-child(1) { width: 10%; } /* ID */
+        th:nth-child(2), td:nth-child(2) { width: 15%; } /* Name */
+        th:nth-child(3), td:nth-child(3) { width: 20%; } /* Purpose */
+        th:nth-child(4), td:nth-child(4) { width: 10%; } /* Lab */
+        th:nth-child(5), td:nth-child(5) { width: 12%; } /* Login */
+        th:nth-child(6), td:nth-child(6) { width: 12%; } /* Logout */
+        th:nth-child(7), td:nth-child(7) { width: 10%; } /* Duration */
+        th:nth-child(8), td:nth-child(8) { width: 11%; } /* Date */
+        
         tr:nth-child(even) { 
             background-color: #f9f9f9; 
         }
         .footer {
             margin-top: 30px;
             text-align: center;
-            font-size: 11px;
+            font-size: 12px;
             color: #666;
             padding-top: 10px;
+            position: running(footer);
+        }
+        .page-break {
+            page-break-after: always;
+        }
+        @media print {
+            .page-break {
+                page-break-after: always;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="university-name">University of Cebu - Main Campus</div>
-        <div class="college-name">College of Computer Studies</div>
-        <div class="report-name">Computer Laboratory Sit-In Monitoring System Report</div>
+    <div class="header-container">
+        {% if uc_logo_b64 %}
+        <img src="data:image/jpeg;base64,{{ uc_logo_b64 }}" class="logo logo-left" alt="UC Logo">
+        {% endif %}
+        {% if ccs_logo_b64 %}
+        <img src="data:image/png;base64,{{ ccs_logo_b64 | safe }}" class="logo logo-right" alt="CCS Logo">
+        {% endif %}
+        <div class="header-text">
+            <div class="university-name">University of Cebu - Main Campus</div>
+            <div class="college-name">College of Computer Studies</div>
+            <div class="report-name">Computer Laboratory Sit-In Monitoring System Report</div>
+        </div>
     </div>
+
+    {% if lab or purpose %}
+    <div class="filter-info">
+        {% if lab %}Report for Laboratory: {{ lab }}{% endif %}
+        {% if lab and purpose %} | {% endif %}
+        {% if purpose %}Purpose: {{ purpose }}{% endif %}
+    </div>
+    {% endif %}
     
     <table cellspacing="0" cellpadding="6">
         <thead>
             <tr>
-                <th>id_number</th>
-                <th>name</th>
-                <th>purpose</th>
-                <th>lab</th>
-                <th>login_time</th>
-                <th>logout_time</th>
-                <th>duration</th>
-                <th>date</th>
+                <th>ID Number</th>
+                <th>Name</th>
+                <th>Purpose</th>
+                <th>Lab</th>
+                <th>Login Time</th>
+                <th>Logout Time</th>
+                <th>Duration</th>
+                <th>Date</th>
             </tr>
         </thead>
         <tbody>
@@ -100,12 +164,31 @@
                 <td>{{ report.duration }}</td>
                 <td>{{ report.date }}</td>
             </tr>
+            {% if loop.index % 25 == 0 and not loop.last %}
+            </tbody>
+        </table>
+        <div class="page-break"></div>
+        <table cellspacing="0" cellpadding="6">
+            <thead>
+                <tr>
+                    <th>ID Number</th>
+                    <th>Name</th>
+                    <th>Purpose</th>
+                    <th>Lab</th>
+                    <th>Login Time</th>
+                    <th>Logout Time</th>
+                    <th>Duration</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% endif %}
             {% endfor %}
         </tbody>
     </table>
     
     <div class="footer">
-        <p>© {{ timestamp.split('-')[0] }} University of Cebu - College of Computer Studies | Sit-In Monitoring System</p>
+        <p>Generated on {{ timestamp }} | © {{ timestamp.split('-')[0] }} University of Cebu - College of Computer Studies</p>
     </div>
 </body>
 </html>

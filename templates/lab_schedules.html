@@ -71,7 +71,7 @@
                                     {% if lab.computers is defined %}
                                         {% for computer in lab.computers %}
                                         <div class="computer-item">
-                                            <div class="computer-box {% if computer.status == 'available' %}available{% elif computer.status == 'in_use' %}in-use{% else %}maintenance{% endif %}">
+                                            <div class="computer-box {% if computer.status == 'available' %}available{% elif computer.status == 'in_use' %}in-use{% endif %}">
                                                 {{ computer.pc_number }}
                                             </div>
                                             <span class="status-indicator">
@@ -96,9 +96,6 @@
                                         </span>
                                         <span class="legend-item">
                                             <i class="fas fa-square text-danger"></i> In Use
-                                        </span>
-                                        <span class="legend-item">
-                                            <i class="fas fa-square text-warning"></i> Maintenance
                                         </span>
                                     </div>
                                     <a href="{{ url_for('student.reserve') }}" class="btn btn-primary btn-sm">
@@ -152,11 +149,7 @@
         background-color: var(--danger, #dc3545);
     }
     
-    .computer-box.maintenance {
-        background-color: var(--warning, #ffc107);
-        color: #212529;
-    }
-    
+
     .computer-item {
         position: relative;
     }
@@ -179,4 +172,4 @@
         }
     }
 </style>
-{% endblock %} 
+{% endblock %}
