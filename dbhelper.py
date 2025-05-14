@@ -1567,3 +1567,154 @@ def get_computer_number_by_id(computer_id):
         return None
     finally:
         conn.close()
+
+# Lab Schedule Management Functions
+def ensure_lab_schedules_table():
+    """Create the lab_schedules table if it doesn't exist"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS lab_schedules (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                day TEXT NOT NULL,
+                time_slot TEXT NOT NULL,
+                lab TEXT,
+                is_available INTEGER DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(day, time_slot)
+            )
+        """)
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error creating lab_schedules table: {e}")
+        return False
+    finally:
+        conn.close()
+
+def get_lab_schedules():
+    """Get all lab schedules from the database"""
+    # Ensure table exists
+    ensure_lab_schedules_table()
+    
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT id, day, time_slot, lab, is_available
+            FROM lab_schedules
+            ORDER BY 
+                CASE 
+                    WHEN day = 'Monday' THEN 1
+                    WHEN day = 'Tuesday' THEN 2
+                    WHEN day = 'Wednesday' THEN 3
+                    WHEN day = 'Thursday' THEN 4
+                    WHEN day = 'Friday' THEN 5
+                    WHEN day = 'Saturday' THEN 6
+                    ELSE 7
+                END,
+                CASE
+                    WHEN time_slot LIKE '7:30%' THEN 1
+                    WHEN time_slot LIKE '9:00%' THEN 2
+                    WHEN time_slot LIKE '10:30%' THEN 3
+                    WHEN time_slot LIKE '1:00%' THEN 4
+                    WHEN time_slot LIKE '2:30%' THEN 5
+                    WHEN time_slot LIKE '4:00%' THEN 6
+                    WHEN time_slot LIKE '5:30%' THEN 7
+                    WHEN time_slot LIKE '7:00%' THEN 8
+                    WHEN time_slot LIKE '8:30%' THEN 9
+                    ELSE 10
+                END
+        """)
+        schedules = []
+        for row in cursor.fetchall():
+            schedules.append({
+                'id': row[0],
+                'day': row[1],
+                'time_slot': row[2],
+                'lab': row[3],
+                'is_available': bool(row[4])
+            })
+        return schedules
+    except Exception as e:
+        print(f"Error getting lab schedules: {e}")
+        return []
+    finally:
+        conn.close()
+
+def save_schedule(day, time_slot, lab):
+    """Save or update a lab schedule"""
+    # Ensure table exists
+    ensure_lab_schedules_table()
+    
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        # Check if schedule already exists
+        cursor.execute("""
+            SELECT id FROM lab_schedules
+            WHERE day = ? AND time_slot = ?
+        """, (day, time_slot))
+        result = cursor.fetchone()
+        
+        if result:
+            # Update existing schedule
+            cursor.execute("""
+                UPDATE lab_schedules
+                SET lab = ?, updated_at = datetime('now', 'localtime')
+                WHERE id = ?
+            """, (lab, result[0]))
+        else:
+            # Insert new schedule
+            cursor.execute("""
+                INSERT INTO lab_schedules (day, time_slot, lab, is_available)
+                VALUES (?, ?, ?, 1)
+            """, (day, time_slot, lab))
+        
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error saving lab schedule: {e}")
+        conn.rollback()
+        return False
+    finally:
+        conn.close()
+
+def delete_schedule(day, time_slot):
+    """Delete a lab schedule"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            DELETE FROM lab_schedules
+            WHERE day = ? AND time_slot = ?
+        """, (day, time_slot))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error deleting lab schedule: {e}")
+        conn.rollback()
+        return False
+    finally:
+        conn.close()
+
+def update_schedule_availability(day, time_slot, is_available):
+    """Update the availability of a schedule"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            UPDATE lab_schedules
+            SET is_available = ?, updated_at = datetime('now', 'localtime')
+            WHERE day = ? AND time_slot = ?
+        """, (1 if is_available else 0, day, time_slot))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error updating schedule availability: {e}")
+        conn.rollback()
+        return False
+    finally:
+        conn.close()

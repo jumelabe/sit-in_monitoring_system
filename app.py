@@ -33,6 +33,7 @@ try:
     initialize_sample_computers()
     ensure_reservation_table()
     ensure_resource_table()
+    ensure_lab_schedules_table()
     print("Database tables initialized successfully")
 except Exception as e:
     print(f"Error initializing database tables: {e}")

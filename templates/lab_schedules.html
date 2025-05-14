@@ -48,128 +48,258 @@
                     <h2 class="section-title">
                         <i class="fas fa-calendar-alt"></i> Lab Schedules
                     </h2>
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle"></i> 
-                        View available computers in each laboratory without making a reservation.
-                    </div>
                 </div>
             </div>
             
-            <div class="row">
-                {% if labs is defined and labs %}
-                    {% for lab in labs %}
-                    <div class="col-md-6 mb-4">
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h3 class="card-title">{{ lab.name }}</h3>
-                                <span class="badge {% if lab.available > 0 %}bg-success{% else %}bg-danger{% endif %}">
-                                    {{ lab.available }} / {{ lab.total }} available
-                                </span>
+            <!-- Lab Schedule Calendar -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h3 class="card-title"><i class="fas fa-calendar-week me-2"></i>Lab Schedule Calendar</h3>
+                            <div class="legend d-flex align-items-center">
+                                <div class="legend-item">
+                                    <div class="square-indicator available"></div> Available for Sit-In
+                                </div>
+                                <div class="legend-item ms-3">
+                                    <div class="square-indicator has-lab"></div> Occupied with Class
+                                </div>
                             </div>
-                            <div class="card-body">
-                                <div class="computer-grid">
-                                    {% if lab.computers is defined %}
-                                        {% for computer in lab.computers %}
-                                        <div class="computer-item">
-                                            <div class="computer-box {% if computer.status == 'available' %}available{% elif computer.status == 'in_use' %}in-use{% endif %}">
-                                                {{ computer.pc_number }}
-                                            </div>
-                                            <span class="status-indicator">
-                                                {% if computer.status == 'available' %}
-                                                <i class="fas fa-check-circle text-success"></i>
-                                                {% elif computer.status == 'in_use' %}
-                                                <i class="fas fa-user text-danger"></i>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="schedule-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Time</th>
+                                            <th>Monday</th>
+                                            <th>Tuesday</th>
+                                            <th>Wednesday</th>
+                                            <th>Thursday</th>
+                                            <th>Friday</th>
+                                            <th>Saturday</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for row in schedule_grid %}
+                                        <tr>
+                                            <td>{{ row.time }}</td>
+                                            {% for day_data in row.days %}
+                                                {% if day_data.lab %}
+                                                    <td class="schedule-cell has-lab">
+                                                        <div class="lab-info">
+                                                            <span class="lab-name">
+                                                                {% if day_data.lab.startswith('Room') %}
+                                                                Lab {{ day_data.lab.replace('Room ', '') }}
+                                                                {% else %}
+                                                                Lab {{ day_data.lab }}
+                                                                {% endif %}
+                                                            </span>
+                                                            <span class="lab-status"><i class="fas fa-chalkboard-teacher me-1"></i>Class in Session</span>
+                                                        </div>
+                                                    </td>
+                                                {% elif day_data.is_available %}
+                                                    <td class="schedule-cell available">
+                                                        <div class="lab-status"><i class="fas fa-check-circle me-1"></i>Available for Sit-In</div>
+                                                    </td>
                                                 {% else %}
-                                                <i class="fas fa-tools text-warning"></i>
+                                                    <td class="schedule-cell has-lab">
+                                                        <div class="lab-status"><i class="fas fa-ban me-1"></i>Occupied with Class</div>
+                                                    </td>
                                                 {% endif %}
-                                            </span>
-                                        </div>
+                                            {% endfor %}
+                                        </tr>
                                         {% endfor %}
-                                    {% endif %}
-                                </div>
-                            </div>
-                            <div class="card-footer">
-                                <div class="d-flex justify-content-between">
-                                    <div>
-                                        <span class="legend-item">
-                                            <i class="fas fa-square text-success"></i> Available
-                                        </span>
-                                        <span class="legend-item">
-                                            <i class="fas fa-square text-danger"></i> In Use
-                                        </span>
-                                    </div>
-                                    <a href="{{ url_for('student.reserve') }}" class="btn btn-primary btn-sm">
-                                        <i class="fas fa-calendar-check"></i> Reserve Computer
-                                    </a>
-                                </div>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-body text-center py-5">
-                                <i class="fas fa-info-circle fs-1 text-muted mb-3"></i>
-                                <p class="mb-0">No laboratory information available at this time.</p>
-                            </div>
-                        </div>
-                    </div>
-                {% endif %}
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <style>
-    .computer-grid {
-        display: grid;
-        grid-template-columns: repeat(10, 1fr);
-        gap: 10px;
-        margin-bottom: 15px;
+    /* Lab Schedule Styles */
+    .schedule-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
     }
     
-    .computer-box {
-        width: 100%;
-        aspect-ratio: 1;
+    .schedule-table th, 
+    .schedule-table td {
+        border: 1px solid #e9ecef;
+        padding: 12px;
+        text-align: center;
+    }
+    
+    .schedule-table th {
+        background-color: #f1f5f9;
+        font-weight: 600;
+        color: #475569;
+        text-transform: uppercase;
+        font-size: 0.85rem;
+        letter-spacing: 0.5px;
+    }
+    
+    .schedule-table tbody tr:hover {
+        background-color: rgba(249, 250, 251, 0.6);
+    }
+    
+    .schedule-cell {
+        min-width: 140px;
+        height: 70px;
+        position: relative;
+        transition: all 0.2s ease;
+    }
+    
+    .schedule-cell.available {
+        background-color: #dcfce7;
+        border: 1px solid #22c55e;
+    }
+    
+    .schedule-cell.available:hover {
+        background-color: #bbf7d0;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+    }
+    
+    .schedule-cell.has-lab {
+        background-color: #dbeafe;
+        border: 1px solid #3b82f6;
+    }
+    
+    .schedule-cell.has-lab:hover {
+        background-color: #bfdbfe;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+    }
+    
+    .lab-info {
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
-        border-radius: 5px;
-        font-weight: bold;
-        color: #fff;
-        position: relative;
+        height: 100%;
     }
     
-    .computer-box.available {
-        background-color: var(--success, #28a745);
+    .lab-name {
+        font-weight: 700;
+        color: #1e293b;
+        font-size: 1.1rem;
     }
     
-    .computer-box.in-use {
-        background-color: var(--danger, #dc3545);
+    .lab-status {
+        font-size: 0.8rem;
+        margin-top: 4px;
+        color: #475569;
+        font-weight: 500;
     }
     
-
-    .computer-item {
-        position: relative;
+    .square-indicator {
+        width: 18px;
+        height: 18px;
+        margin-right: 6px;
+        border-radius: 4px;
+        display: inline-block;
+        vertical-align: middle;
     }
     
-    .status-indicator {
-        position: absolute;
-        top: -5px;
-        right: -5px;
-        font-size: 12px;
+    .square-indicator.available {
+        background-color: #dcfce7;
+        border: 1px solid #22c55e;
+    }
+    
+    .square-indicator.has-lab {
+        background-color: #dbeafe;
+        border: 1px solid #3b82f6;
+    }
+    
+    .legend {
+        background-color: #f8fafc;
+        padding: 8px 15px;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
     }
     
     .legend-item {
-        margin-right: 15px;
-        font-size: 0.8rem;
+        display: flex;
+        align-items: center;
+        font-size: 0.9rem;
+        font-weight: 500;
+        color: #334155;
+    }
+    
+    .card {
+        border-radius: 12px;
+        border: none;
+        box-shadow: 0 4px 25px rgba(0, 0, 0, 0.05);
+        overflow: hidden;
+    }
+    
+    .card-header {
+        background-color: #ffffff;
+        border-bottom: 1px solid #f1f5f9;
+        padding: 20px 25px;
+    }
+    
+    .card-title {
+        font-weight: 600;
+        color: #0f172a;
+        margin-bottom: 0;
+    }
+    
+    .card-body {
+        padding: 25px;
+    }
+    
+    .section-title {
+        color: #0f172a;
+        font-weight: 700;
+        margin-bottom: 5px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .section-title i {
+        color: #3b82f6;
     }
     
     @media (max-width: 768px) {
-        .computer-grid {
-            grid-template-columns: repeat(5, 1fr);
+        .legend {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
         }
+        
+        .legend-item.ms-3 {
+            margin-left: 0 !important;
+            margin-top: 8px;
+        }
+        
+        .card-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        
+        .legend {
+            margin-top: 15px;
+            width: 100%;
+        }
+    }
+    
+    .schedule-table tbody tr td:first-child {
+        background-color: #f8fafc;
+        font-weight: 600;
+        color: #334155;
+        white-space: nowrap;
     }
 </style>
 {% endblock %}

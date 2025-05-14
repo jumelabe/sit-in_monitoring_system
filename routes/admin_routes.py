@@ -663,7 +663,7 @@ def leaderboards():
         leaderboard_data=leaderboard_data
     )
 
-@admin_bp.route('/resources', methods=['GET', 'POST'])
+@admin_bp.route('/admin_resources', methods=['GET', 'POST'])
 def admin_resources():
     if session.get('user_type') != 'admin':
         flash("Admin access required.", "danger")
@@ -671,6 +671,8 @@ def admin_resources():
 
     upload_error = None
     if request.method == 'POST':
+
+        
         title = request.form.get('title', '').strip()
         description = request.form.get('description', '').strip()
         url_link = request.form.get('resource_url', '').strip()
@@ -705,9 +707,18 @@ def admin_resources():
             return redirect(url_for('admin.admin_resources'))
 
     resources = get_all_resources()
+    
+    # Get lab schedules for the schedule tab
+    schedules = get_lab_schedules()
+    
+    # Get lab rooms for the lab selection dropdown
+    lab_rooms = get_lab_rooms()
+    
     return render_template(
         'admin/admin_resources.html',
         resources=resources,
+        schedules=schedules,
+        lab_rooms=lab_rooms,
         upload_error=upload_error
     )
 
@@ -1456,3 +1467,76 @@ def deny_reservation(request_id):
     finally:
         conn.close()
     return redirect(url_for('admin.computer_control', tab='requests'))
+
+@admin_bp.route('/save_lab_schedule', methods=['POST'])
+def save_lab_schedule():
+    if session.get('user_type') != 'admin':
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+        
+    try:
+        day = request.json.get('day')
+        time_slot = request.json.get('timeSlot')
+        lab = request.json.get('lab')
+        
+        if not all([day, time_slot, lab]):
+            return jsonify({'success': False, 'message': 'Missing required fields'}), 400
+            
+        # Check if the time slot is in the expected format: "HH:MM AM/PM - HH:MM AM/PM"
+        if not isinstance(time_slot, str) or ' - ' not in time_slot:
+            return jsonify({'success': False, 'message': 'Invalid time slot format'}), 400
+            
+        # Save to database
+        save_schedule(day, time_slot, lab)
+        
+        return jsonify({
+            'success': True,
+            'message': f'Schedule added for {lab} on {day} at {time_slot}'
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@admin_bp.route('/delete_lab_schedule', methods=['POST'])
+def delete_lab_schedule():
+    if session.get('user_type') != 'admin':
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+        
+    try:
+        day = request.json.get('day')
+        time_slot = request.json.get('timeSlot')
+        
+        if not all([day, time_slot]):
+            return jsonify({'success': False, 'message': 'Missing required fields'}), 400
+            
+        # Delete from database
+        delete_schedule(day, time_slot)
+        
+        return jsonify({
+            'success': True,
+            'message': f'Schedule removed for {day} at {time_slot}'
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@admin_bp.route('/toggle_schedule_availability', methods=['POST'])
+def toggle_schedule_availability():
+    if session.get('user_type') != 'admin':
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+        
+    try:
+        day = request.json.get('day')
+        time_slot = request.json.get('timeSlot')
+        is_available = request.json.get('isAvailable')
+        
+        if not all([day, time_slot]) or is_available is None:
+            return jsonify({'success': False, 'message': 'Missing required fields'}), 400
+            
+        # Update availability in database
+        update_schedule_availability(day, time_slot, is_available)
+        
+        status = "available" if is_available else "occupied"
+        return jsonify({
+            'success': True,
+            'message': f'Schedule for {day} at {time_slot} marked as {status}'
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500

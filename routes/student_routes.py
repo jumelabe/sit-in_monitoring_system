@@ -346,15 +346,67 @@ def get_available_computers(lab_room):
 
 @student_bp.route('/lab-schedules')
 def lab_schedules():
+    return redirect(url_for('student.lab_schedules_view'))
+
+@student_bp.route('/lab_schedules')
+def lab_schedules_view():
     if session.get('user_type') != 'student':
         session.clear()
         return redirect(url_for('auth.login'))
     
-    # Get all lab rooms
+    student = get_student_by_id(session['user_id'])
+    
+    # Get all lab schedules
+    schedules = get_lab_schedules()
+    
+    # Format time slots and days for better display
+    time_slots = [
+        '7:30 AM - 9:00 AM',
+        '9:00 AM - 10:30 AM',
+        '10:30 AM - 12:00 PM',
+        '1:00 PM - 2:30 PM',
+        '2:30 PM - 4:00 PM',
+        '4:00 PM - 5:30 PM',
+        '5:30 PM - 7:00 PM',
+        '7:00 PM - 8:30 PM',
+        '8:30 PM - 9:30 PM'
+    ]
+    
+    days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+    
+    # Create a 2D grid for easy rendering
+    schedule_grid = []
+    for time_slot in time_slots:
+        row = {'time': time_slot, 'days': []}
+        for day in days:
+            # Find any lab scheduled for this time/day
+            scheduled_lab = None
+            is_available = True
+            
+            for schedule in schedules:
+                if schedule['time_slot'] == time_slot and schedule['day'] == day:
+                    scheduled_lab = schedule['lab']
+                    is_available = schedule['is_available']
+                    break
+            
+            # Format the lab name to ensure consistency
+            if scheduled_lab:
+                # If it starts with "Room", replace it with "Lab"
+                if scheduled_lab.startswith("Room "):
+                    scheduled_lab = scheduled_lab.replace("Room ", "")
+                # If it doesn't have Lab prefix, use as is (backend will format it)
+                
+            row['days'].append({
+                'day': day,
+                'lab': scheduled_lab,
+                'is_available': is_available
+            })
+        schedule_grid.append(row)
+    
+    # Get computer availability for labs
+    labs_data = []
     lab_rooms = get_lab_rooms()
     
-    # Get computer availability for each lab
-    labs_data = []
     for lab in lab_rooms:
         computers = get_computers_by_lab(lab)
         available_count = sum(1 for computer in computers if computer['status'] == 'available')
@@ -367,4 +419,7 @@ def lab_schedules():
             'computers': computers
         })
     
-    return render_template('lab_schedules.html', labs=labs_data)
+    return render_template('lab_schedules.html', 
+                         student=student,
+                         schedule_grid=schedule_grid,
+                         labs=labs_data)

@@ -5,7 +5,7 @@
 {% block content %}
 <div class="dashboard-container">
     <div class="sidebar">
-        <h1 class="dashboard-title">Resources</h1>
+        <h1 class="dashboard-title">Laboratory</h1>
         <a href="{{ url_for('admin.admin_dashboard') }}" class="menu-btn">Dashboard</a>
         <a href="{{ url_for('admin.student_list') }}" class="menu-btn">Student List</a>
         <a href="{{ url_for('admin.current_sit_in') }}" class="menu-btn">Current Sit-in</a>
@@ -14,99 +14,278 @@
         <a href="{{ url_for('admin.reports') }}" class="menu-btn">Reports</a>
         <a href="{{ url_for('admin.feedback_reports') }}" class="menu-btn">View Feedback</a>
         <a href="{{ url_for('admin.leaderboards') }}" class="menu-btn">Leaderboards</a>
-        <a href="{{ url_for('admin.admin_resources') }}" class="menu-btn active">Resources</a>
+        <a href="{{ url_for('admin.admin_resources') }}" class="menu-btn active">Laboratory</a>
         <a href="{{ url_for('admin.logout') }}" class="menu-btn logout-btn">Logout</a>
     </div>
 
     <div class="content">
         <div class="container">
-            <div class="table-container">
-                <div class="table-header">
-                    <h2 class="table-title">Upload Lab Resource/Material</h2>
-                </div>
-                <div class="card">
-                    <form method="post" enctype="multipart/form-data" class="mb-4">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <input type="text" name="title" placeholder="Resource Title" required class="form-control">
-                        <textarea name="description" placeholder="Description" class="form-control"></textarea>
-                        <div class="upload-inputs">
-                            <input type="file" name="resource_file" class="form-control">
-                            <span>or</span>
-                            <input type="url" name="resource_url" placeholder="Paste URL here" class="form-control">
+            <ul class="nav nav-tabs mb-4" id="labTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="resources-tab" data-bs-toggle="tab" data-bs-target="#resources" type="button" role="tab" aria-controls="resources" aria-selected="true">Resources</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="schedules-tab" data-bs-toggle="tab" data-bs-target="#schedules" type="button" role="tab" aria-controls="schedules" aria-selected="false">Lab Schedules</button>
+                </li>
+            </ul>
+            
+            <div class="tab-content" id="labTabsContent">
+                <div class="tab-pane fade show active" id="resources" role="tabpanel" aria-labelledby="resources-tab">
+                    <div class="table-container">
+                        <div class="table-header">
+                            <h2 class="table-title">Upload Lab Resource/Material</h2>
                         </div>
-                        <small class="text-muted">Upload a file or provide a URL (not both).</small>
-                        <button type="submit" class="btn btn-primary">Upload</button>
-                    </form>
-                    {% if upload_error %}
-                        <div class="alert alert-danger">{{ upload_error }}</div>
-                    {% endif %}
-                    {% with messages = get_flashed_messages(with_categories=true) %}
-                        {% if messages %}
-                            {% for category, message in messages %}
-                                <div class="alert alert-{{ category }} mt-2">{{ message }}</div>
-                            {% endfor %}
-                        {% endif %}
-                    {% endwith %}
-                </div>
-            </div>
+                        <div class="card">
+                            <form method="post" enctype="multipart/form-data" class="mb-4">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="text" name="title" placeholder="Resource Title" required class="form-control">
+                                <textarea name="description" placeholder="Description" class="form-control"></textarea>
+                                <div class="upload-inputs">
+                                    <input type="file" name="resource_file" class="form-control">
+                                    <span>or</span>
+                                    <input type="url" name="resource_url" placeholder="Paste URL here" class="form-control">
+                                </div>
+                                <small class="text-muted">Upload a file or provide a URL (not both).</small>
+                                <button type="submit" class="btn btn-primary">Upload</button>
+                            </form>
+                            {% if upload_error %}
+                                <div class="alert alert-danger">{{ upload_error }}</div>
+                            {% endif %}
+                            {% with messages = get_flashed_messages(with_categories=true) %}
+                                {% if messages %}
+                                    {% for category, message in messages %}
+                                        <div class="alert alert-{{ category }} mt-2">{{ message }}</div>
+                                    {% endfor %}
+                                {% endif %}
+                            {% endwith %}
+                        </div>
+                    </div>
 
-            <div class="table-container">
-                <div class="table-header">
-                    <h2 class="table-title">Available Resources</h2>
+                    <div class="table-container">
+                        <div class="table-header">
+                            <h2 class="table-title">Available Resources</h2>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="custom-table">
+                                <thead>
+                                    <tr>
+                                        <th>Title</th>
+                                        <th>Description</th>
+                                        <th>File/URL</th>
+                                        <th>Uploaded At</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for resource in resources %}
+                                    <tr>
+                                        <td>{{ resource['title'] }}</td>
+                                        <td>{{ resource['description'] }}</td>
+                                        <td>
+                                            {% if resource['file_name'] %}
+                                            <a href="{{ url_for('admin.download_resource', filename=resource['file_name']) }}" target="_blank">{{ resource['file_name'] }}</a>
+                                            {% elif resource['url'] %}
+                                            <a href="{{ resource['url'] }}" target="_blank">{{ resource['url'] }}</a>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ resource['uploaded_at'] }}</td>
+                                        <td>
+                                            {% if resource['enabled'] %}
+                                            <span class="badge bg-success">Enabled</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">Disabled</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="action-btn-group">
+                                                <form action="{{ url_for('admin.enable_resource', resource_id=resource['id']) }}" method="post" style="display:inline;">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <input type="hidden" name="enabled" value="{{ 0 if resource['enabled'] else 1 }}">
+                                                    <button type="submit" class="btn btn-sm {{ 'btn-warning' if resource['enabled'] else 'btn-success' }}">
+                                                        {{ 'Disable' if resource['enabled'] else 'Enable' }}
+                                                    </button>
+                                                </form>
+                                                <form action="{{ url_for('admin.delete_resource_route', resource_id=resource['id']) }}" method="post" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this resource?');">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <button type="submit" class="btn btn-sm btn-danger btn-icon" title="Delete">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
-                <div class="table-responsive">
-                    <table class="custom-table">
-                        <thead>
-                            <tr>
-                                <th>Title</th>
-                                <th>Description</th>
-                                <th>File/URL</th>
-                                <th>Uploaded At</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for resource in resources %}
-                            <tr>
-                                <td>{{ resource['title'] }}</td>
-                                <td>{{ resource['description'] }}</td>
-                                <td>
-                                    {% if resource['file_name'] %}
-                                    <a href="{{ url_for('admin.download_resource', filename=resource['file_name']) }}" target="_blank">{{ resource['file_name'] }}</a>
-                                    {% elif resource['url'] %}
-                                    <a href="{{ resource['url'] }}" target="_blank">{{ resource['url'] }}</a>
-                                    {% endif %}
-                                </td>
-                                <td>{{ resource['uploaded_at'] }}</td>
-                                <td>
-                                    {% if resource['enabled'] %}
-                                    <span class="badge bg-success">Enabled</span>
-                                    {% else %}
-                                    <span class="badge bg-secondary">Disabled</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <div class="action-btn-group">
-                                        <form action="{{ url_for('admin.enable_resource', resource_id=resource['id']) }}" method="post" style="display:inline;">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                            <input type="hidden" name="enabled" value="{{ 0 if resource['enabled'] else 1 }}">
-                                            <button type="submit" class="btn btn-sm {{ 'btn-warning' if resource['enabled'] else 'btn-success' }}">
-                                                {{ 'Disable' if resource['enabled'] else 'Enable' }}
-                                            </button>
-                                        </form>
-                                        <form action="{{ url_for('admin.delete_resource_route', resource_id=resource['id']) }}" method="post" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this resource?');">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                            <button type="submit" class="btn btn-sm btn-danger btn-icon" title="Delete">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </form>
+                
+                <div class="tab-pane fade" id="schedules" role="tabpanel" aria-labelledby="schedules-tab">
+                    <div class="table-container">
+                        <div class="table-header">
+                            <h2 class="table-title">Lab Schedule Management</h2>
+                        </div>
+                        <div class="card">
+                            <div class="alert alert-primary mx-3 mt-3">
+                                <i class="fas fa-info-circle me-2"></i> 
+                                <strong>Note:</strong> Students will see this schedule to check when labs are available for sit-in. Click on a cell to toggle between available and occupied.
+                            </div>
+                            
+                            <!-- Add a hidden form for lab room selection -->
+                            <div class="mx-3 mt-3 mb-4">
+                                <form id="addScheduleForm" style="display: none;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <div class="row g-3">
+                                        <div class="col-md-3">
+                                            <label for="daySelect" class="form-label">Day</label>
+                                            <select id="daySelect" class="form-select" required>
+                                                <option value="">Select Day</option>
+                                                <option value="Monday">Monday</option>
+                                                <option value="Tuesday">Tuesday</option>
+                                                <option value="Wednesday">Wednesday</option>
+                                                <option value="Thursday">Thursday</option>
+                                                <option value="Friday">Friday</option>
+                                                <option value="Saturday">Saturday</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label for="timeSlotSelect" class="form-label">Time Slot</label>
+                                            <select id="timeSlotSelect" class="form-select" required>
+                                                <option value="">Select Time</option>
+                                                <option value="7:30 AM - 9:00 AM">7:30 AM - 9:00 AM</option>
+                                                <option value="9:00 AM - 10:30 AM">9:00 AM - 10:30 AM</option>
+                                                <option value="10:30 AM - 12:00 PM">10:30 AM - 12:00 PM</option>
+                                                <option value="1:00 PM - 2:30 PM">1:00 PM - 2:30 PM</option>
+                                                <option value="2:30 PM - 4:00 PM">2:30 PM - 4:00 PM</option>
+                                                <option value="4:00 PM - 5:30 PM">4:00 PM - 5:30 PM</option>
+                                                <option value="5:30 PM - 7:00 PM">5:30 PM - 7:00 PM</option>
+                                                <option value="7:00 PM - 8:30 PM">7:00 PM - 8:30 PM</option>
+                                                <option value="8:30 PM - 9:30 PM">8:30 PM - 9:30 PM</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label for="labSelect" class="form-label">Lab Room</label>
+                                            <select id="labSelect" class="form-select" required>
+                                                <option value="">Select Lab</option>
+                                                {% for lab_room in lab_rooms %}
+                                                <option value="{{ lab_room }}">{{ lab_room }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="col-md-2 d-flex align-items-end">
+                                            <button type="submit" class="btn btn-primary w-100">Add Schedule</button>
+                                        </div>
                                     </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                                </form>
+                            </div>
+                            
+                            <div class="table-responsive">
+                                <table class="schedule-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="time-header">Time</th>
+                                            <th>Monday</th>
+                                            <th>Tuesday</th>
+                                            <th>Wednesday</th>
+                                            <th>Thursday</th>
+                                            <th>Friday</th>
+                                            <th>Saturday</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="scheduleTableBody">
+                                        <!-- Morning Time Slots -->
+                                        <tr>
+                                            <td class="time-cell">7:30 AM - 9:00 AM</td>
+                                            <td class="schedule-cell available" data-day="Monday" data-time="7:30 AM - 9:00 AM">Available</td>
+                                            <td class="schedule-cell available" data-day="Tuesday" data-time="7:30 AM - 9:00 AM">Available</td>
+                                            <td class="schedule-cell available" data-day="Wednesday" data-time="7:30 AM - 9:00 AM">Available</td>
+                                            <td class="schedule-cell available" data-day="Thursday" data-time="7:30 AM - 9:00 AM">Available</td>
+                                            <td class="schedule-cell available" data-day="Friday" data-time="7:30 AM - 9:00 AM">Available</td>
+                                            <td class="schedule-cell available" data-day="Saturday" data-time="7:30 AM - 9:00 AM">Available</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="time-cell">9:00 AM - 10:30 AM</td>
+                                            <td class="schedule-cell available" data-day="Monday" data-time="9:00 AM - 10:30 AM">Available</td>
+                                            <td class="schedule-cell available" data-day="Tuesday" data-time="9:00 AM - 10:30 AM">Available</td>
+                                            <td class="schedule-cell available" data-day="Wednesday" data-time="9:00 AM - 10:30 AM">Available</td>
+                                            <td class="schedule-cell available" data-day="Thursday" data-time="9:00 AM - 10:30 AM">Available</td>
+                                            <td class="schedule-cell available" data-day="Friday" data-time="9:00 AM - 10:30 AM">Available</td>
+                                            <td class="schedule-cell available" data-day="Saturday" data-time="9:00 AM - 10:30 AM">Available</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="time-cell">10:30 AM - 12:00 PM</td>
+                                            <td class="schedule-cell available" data-day="Monday" data-time="10:30 AM - 12:00 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Tuesday" data-time="10:30 AM - 12:00 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Wednesday" data-time="10:30 AM - 12:00 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Thursday" data-time="10:30 AM - 12:00 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Friday" data-time="10:30 AM - 12:00 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Saturday" data-time="10:30 AM - 12:00 PM">Available</td>
+                                        </tr>
+                                        
+                                        <!-- Afternoon Time Slots -->
+                                        <tr>
+                                            <td class="time-cell">1:00 PM - 2:30 PM</td>
+                                            <td class="schedule-cell available" data-day="Monday" data-time="1:00 PM - 2:30 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Tuesday" data-time="1:00 PM - 2:30 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Wednesday" data-time="1:00 PM - 2:30 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Thursday" data-time="1:00 PM - 2:30 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Friday" data-time="1:00 PM - 2:30 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Saturday" data-time="1:00 PM - 2:30 PM">Available</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="time-cell">2:30 PM - 4:00 PM</td>
+                                            <td class="schedule-cell available" data-day="Monday" data-time="2:30 PM - 4:00 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Tuesday" data-time="2:30 PM - 4:00 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Wednesday" data-time="2:30 PM - 4:00 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Thursday" data-time="2:30 PM - 4:00 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Friday" data-time="2:30 PM - 4:00 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Saturday" data-time="2:30 PM - 4:00 PM">Available</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="time-cell">4:00 PM - 5:30 PM</td>
+                                            <td class="schedule-cell available" data-day="Monday" data-time="4:00 PM - 5:30 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Tuesday" data-time="4:00 PM - 5:30 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Wednesday" data-time="4:00 PM - 5:30 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Thursday" data-time="4:00 PM - 5:30 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Friday" data-time="4:00 PM - 5:30 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Saturday" data-time="4:00 PM - 5:30 PM">Available</td>
+                                        </tr>
+                                        
+                                        <!-- Evening Time Slots -->
+                                        <tr>
+                                            <td class="time-cell">5:30 PM - 7:00 PM</td>
+                                            <td class="schedule-cell available" data-day="Monday" data-time="5:30 PM - 7:00 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Tuesday" data-time="5:30 PM - 7:00 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Wednesday" data-time="5:30 PM - 7:00 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Thursday" data-time="5:30 PM - 7:00 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Friday" data-time="5:30 PM - 7:00 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Saturday" data-time="5:30 PM - 7:00 PM">Available</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="time-cell">7:00 PM - 8:30 PM</td>
+                                            <td class="schedule-cell available" data-day="Monday" data-time="7:00 PM - 8:30 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Tuesday" data-time="7:00 PM - 8:30 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Wednesday" data-time="7:00 PM - 8:30 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Thursday" data-time="7:00 PM - 8:30 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Friday" data-time="7:00 PM - 8:30 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Saturday" data-time="7:00 PM - 8:30 PM">Available</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="time-cell">8:30 PM - 9:30 PM</td>
+                                            <td class="schedule-cell available" data-day="Monday" data-time="8:30 PM - 9:30 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Tuesday" data-time="8:30 PM - 9:30 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Wednesday" data-time="8:30 PM - 9:30 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Thursday" data-time="8:30 PM - 9:30 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Friday" data-time="8:30 PM - 9:30 PM">Available</td>
+                                            <td class="schedule-cell available" data-day="Saturday" data-time="8:30 PM - 9:30 PM">Available</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -138,5 +317,673 @@
         flex-wrap: nowrap;
         justify-content: flex-start;
     }
+    
+    /* Lab Schedule Styles */
+    .schedule-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        border-radius: 5px;
+        overflow: hidden;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+    }
+    
+    .schedule-table th, 
+    .schedule-table td {
+        border: 1px solid #e0e0e0;
+        padding: 12px;
+        text-align: center;
+        transition: all 0.2s ease;
+    }
+    
+    .schedule-table th {
+        background-color: #f8f9fa;
+        font-weight: 600;
+        color: #333;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
+    }
+    
+    .time-header {
+        left: 0;
+        z-index: 11;
+        background-color: #f0f0f0;
+    }
+    
+    .time-cell {
+        background-color: #f8f9fa;
+        font-weight: 500;
+        color: #555;
+        position: sticky;
+        left: 0;
+        z-index: 9;
+        box-shadow: 2px 0 2px -1px rgba(0, 0, 0, 0.1);
+    }
+    
+    .schedule-cell {
+        min-width: 140px;
+        height: 65px;
+        position: relative;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-weight: 500;
+    }
+    
+    .schedule-cell:hover {
+        transform: scale(1.02);
+        box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
+        z-index: 5;
+    }
+    
+    .schedule-cell.available {
+        background-color: #e8f5e9;
+        border: 1px solid #4caf50;
+        color: #2e7d32;
+    }
+    
+    .schedule-cell.occupied {
+        background-color: #ffebee;
+        border: 1px solid #ef5350;
+        color: #c62828;
+    }
+    
+    .schedule-cell.has-lab {
+        background-color: #e3f2fd;
+        border: 1px solid #2196f3;
+        color: #0d47a1;
+    }
+    
+    .lab-info {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        transition: all 0.2s;
+    }
+    
+    .lab-name {
+        font-weight: 600;
+        font-size: 0.9rem;
+        margin-bottom: 3px;
+    }
+    
+    .delete-btn {
+        font-size: 0.7rem;
+        padding: 2px 5px;
+        opacity: 0.8;
+        transition: all 0.2s;
+    }
+    
+    .delete-btn:hover {
+        opacity: 1;
+    }
+    
+    .legend {
+        font-size: 0.85rem;
+    }
+    
+    .legend-item {
+        display: flex;
+        align-items: center;
+    }
+    
+    .square-indicator {
+        width: 16px;
+        height: 16px;
+        margin-right: 5px;
+        border-radius: 3px;
+        transition: all 0.2s;
+    }
+    
+    .square-indicator.available {
+        background-color: #e8f5e9;
+        border: 1px solid #4caf50;
+    }
+    
+    .square-indicator.occupied {
+        background-color: #ffebee;
+        border: 1px solid #ef5350;
+    }
+    
+    .square-indicator.has-lab {
+        background-color: #e3f2fd;
+        border: 1px solid #2196f3;
+    }
+    
+    .schedule-controls {
+        border-radius: 5px 5px 0 0;
+    }
+    
+    /* Day filters for responsive design */
+    @media (max-width: 768px) {
+        .schedule-controls .row {
+            flex-direction: column;
+        }
+        
+        .schedule-controls .col-md-4 {
+            margin-bottom: 10px;
+            width: 100%;
+        }
+        
+        .time-cell, .schedule-cell {
+            min-width: 120px;
+            padding: 8px;
+            font-size: 0.85rem;
+        }
+        
+        .lab-name {
+            font-size: 0.8rem;
+        }
+    }
+
+    /* Common modal styles */
+    .modal-header {
+        background: #ddd4fc;
+        padding: 20px 30px;
+        border-bottom: 1px solid #eee;
+    }
+
+    .modal-content {
+        border: none;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        background: #fff;
+    }
+
+    .modal-body {
+        padding: 30px;
+        background: #fff;
+    }
+
+    .modal-footer {
+        background: #fff;
+        border-top: 1px solid #eee;
+        padding: 20px 30px;
+        gap: 10px;
+    }
+    
+    /* Lab selection modal specific styles */
+    #labSelectionModal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 9999 !important;
+        padding: 0 !important;
+        overflow-x: hidden;
+        overflow-y: auto;
+        pointer-events: auto !important;
+    }
+    
+    .modal-dialog {
+        max-width: 500px;
+        margin: 1.75rem auto;
+        pointer-events: auto !important;
+    }
+    
+    .modal-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: #000;
+        opacity: 0.5 !important;
+        z-index: 9998 !important;
+    }
+    
+    .modal-open {
+        overflow: hidden;
+        padding-right: 15px;
+    }
+    
+    #labSelectionModal .form-select-lg {
+        height: 50px;
+        font-size: 1.1rem;
+        cursor: pointer;
+    }
+    
+    #labSelectionModal .btn-lg {
+        padding: 10px 20px;
+        font-size: 1.1rem;
+    }
+    
+    #labSelectionModal .form-label {
+        font-size: 1.1rem;
+        font-weight: 500;
+        margin-bottom: 10px;
+    }
+    
+    #labSelectionModal select.active {
+        border-color: #4A3599;
+        box-shadow: 0 0 0 0.25rem rgba(74, 53, 153, 0.25);
+    }
+    
+    @media (max-width: 576px) {
+        #labSelectionModal .modal-dialog {
+            margin: 0.5rem;
+        }
+    }
 </style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize schedule cells from database
+    initializeScheduleTable();
+    
+    // Set up form submission
+    setupAddScheduleForm();
+    
+    // Get available lab rooms from the server-provided data
+    function getAvailableLabRooms() {
+        const labOptions = [];
+        const labSelect = document.getElementById('labSelect');
+        
+        if (labSelect && labSelect.options) {
+            for (let i = 0; i < labSelect.options.length; i++) {
+                const opt = labSelect.options[i];
+                if (opt.value) {
+                    labOptions.push(opt.value);
+                }
+            }
+        } else {
+            // Fallback if select element not found (should not happen)
+            labOptions.push('Lab 1', 'Lab 2', 'Lab 3');
+        }
+        
+        return labOptions;
+    }
+    
+    function initializeScheduleTable() {
+        // Load schedule data from the hidden JSON
+        let schedulesData = [];
+        try {
+            const schedulesElement = document.getElementById('schedules-data');
+            if (schedulesElement) {
+                schedulesData = JSON.parse(schedulesElement.textContent || '[]');
+            }
+        } catch (e) {
+            console.error('Error parsing schedules data:', e);
+        }
+        
+        // Apply schedules to table
+        schedulesData.forEach(schedule => {
+            const cell = findScheduleCell(schedule.day, schedule.time_slot);
+            if (cell) {
+                if (schedule.lab) {
+                    // If has a lab assigned
+                    cell.className = 'schedule-cell has-lab';
+                    cell.innerHTML = `
+                        <div class="lab-info">
+                            <span class="lab-name">${schedule.lab}</span>
+                            <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+                        </div>
+                    `;
+                } else if (!schedule.is_available) {
+                    // If marked as occupied without a lab
+                    cell.className = 'schedule-cell occupied';
+                    cell.textContent = 'Occupied';
+                }
+            }
+        });
+        
+        // Attach click handlers to all cells
+        document.querySelectorAll('.schedule-cell').forEach(cell => {
+            cell.addEventListener('click', function(e) {
+                // Don't toggle if clicking the delete button
+                if (e.target.classList.contains('delete-btn')) {
+                    return;
+                }
+                
+                // If cell has lab info, don't toggle
+                if (cell.querySelector('.lab-info')) {
+                    return;
+                }
+                
+                const day = getColumnDay(this);
+                const timeSlot = getRowTimeSlot(this);
+                
+                if (!day || !timeSlot) {
+                    return;
+                }
+                
+                const isCurrentlyAvailable = this.classList.contains('available');
+                
+                if (isCurrentlyAvailable) {
+                    // If the cell is available, prompt for lab room selection
+                    const labSelect = document.getElementById('labSelect');
+                    
+                    // Get all lab options
+                    const labOptions = getAvailableLabRooms();
+                    
+                    // Create lab selection dialog
+                    const labDialog = document.createElement('div');
+                    labDialog.className = 'modal fade';
+                    labDialog.id = 'labSelectionModal';
+                    labDialog.setAttribute('tabindex', '-1');
+                    labDialog.setAttribute('aria-labelledby', 'labSelectionModalLabel');
+                    labDialog.setAttribute('aria-hidden', 'true');
+                    labDialog.style.zIndex = '9999';
+                    labDialog.style.display = 'block';
+                    labDialog.innerHTML = `
+                        <div class="modal-dialog modal-dialog-centered" style="pointer-events: all !important;">
+                            <div class="modal-content" style="pointer-events: all !important;">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="labSelectionModalLabel">Select Lab Room</h5>
+                                    <button type="button" class="btn-close" id="closeLabModal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <form id="labSelectionForm">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <div class="mb-3">
+                                            <label class="form-label">Lab Room for ${day}, ${timeSlot}</label>
+                                            <select class="form-select form-select-lg" id="modalLabSelect" required>
+                                                <option value="">Select Lab</option>
+                                                ${labOptions.map(lab => `<option value="${lab}">${lab}</option>`).join('')}
+                                            </select>
+                                        </div>
+                                    </form>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" id="cancelLabSelection">Cancel</button>
+                                    <button type="button" class="btn btn-primary btn-lg" id="confirmLabSelection">Save</button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    document.body.appendChild(labDialog);
+                    
+                    // Add backdrop manually
+                    const backdrop = document.createElement('div');
+                    backdrop.className = 'modal-backdrop fade show';
+                    backdrop.style.zIndex = '9998';
+                    document.body.appendChild(backdrop);
+                    document.body.classList.add('modal-open');
+                    
+                    // Show the modal without Bootstrap
+                    setTimeout(() => {
+                        labDialog.classList.add('show');
+                    }, 50);
+                    
+                    // Handle cancel and close button actions
+                    const closeModal = () => {
+                        labDialog.classList.remove('show');
+                        setTimeout(() => {
+                            document.body.removeChild(labDialog);
+                            document.body.removeChild(backdrop);
+                            document.body.classList.remove('modal-open');
+                        }, 300);
+                    };
+                    
+                    document.getElementById('closeLabModal').addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        closeModal();
+                    });
+                    
+                    document.getElementById('cancelLabSelection').addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        closeModal();
+                    });
+                    
+                    // Handle lab selection confirmation
+                    const confirmBtn = document.getElementById('confirmLabSelection');
+                    confirmBtn.style.cursor = 'pointer';
+                    
+                    // Also make the selection trigger when pressing Enter in the select
+                    document.getElementById('modalLabSelect').addEventListener('change', function(e) {
+                        e.stopPropagation();
+                        this.classList.add('active');
+                    });
+                    
+                    // Add submit listener to the form
+                    document.getElementById('labSelectionForm').addEventListener('submit', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        confirmBtn.click();
+                    });
+                    
+                    confirmBtn.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        const selectedLab = document.getElementById('modalLabSelect').value;
+                        
+                        if (!selectedLab) {
+                            alert('Please select a lab room');
+                            return;
+                        }
+                        
+                        // Call API to save schedule with lab
+                        fetch('/admin/save_lab_schedule', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+                            },
+                            body: JSON.stringify({
+                                day: day,
+                                timeSlot: timeSlot,
+                                lab: selectedLab
+                            })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                // Update the cell with lab info
+                                cell.className = 'schedule-cell has-lab';
+                                cell.innerHTML = `
+                                    <div class="lab-info">
+                                        <span class="lab-name">${selectedLab}</span>
+                                        <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+                                    </div>
+                                `;
+                                
+                                // Add click handler to the new delete button
+                                cell.querySelector('.delete-btn').addEventListener('click', deleteLabHandler);
+                                
+                                // Close the modal
+                                closeModal();
+                            } else {
+                                alert('Error: ' + data.message);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            alert('Failed to add schedule.');
+                        });
+                    });
+                } else {
+                    // If already occupied, toggle back to available
+                    toggleAvailability(cell, day, timeSlot, true);
+                }
+            });
+        });
+        
+        // Add delete button functionality
+        document.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.addEventListener('click', deleteLabHandler);
+        });
+    }
+    
+    function setupAddScheduleForm() {
+        document.getElementById('addScheduleForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const day = document.getElementById('daySelect').value;
+            const timeSlot = document.getElementById('timeSlotSelect').value;
+            const lab = document.getElementById('labSelect').value;
+            
+            if (!day || !timeSlot || !lab) {
+                alert('Please fill in all fields');
+                return;
+            }
+            
+            // Call API to save schedule
+            fetch('/admin/save_lab_schedule', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+                },
+                body: JSON.stringify({
+                    day: day,
+                    timeSlot: timeSlot,
+                    lab: lab
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Find and update the cell
+                    const cell = findScheduleCell(day, timeSlot);
+                    if (cell) {
+                        cell.className = 'schedule-cell has-lab';
+                        cell.innerHTML = `
+                            <div class="lab-info">
+                                <span class="lab-name">${lab}</span>
+                                <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+                            </div>
+                        `;
+                        
+                        // Add click handler to the new delete button
+                        cell.querySelector('.delete-btn').addEventListener('click', deleteLabHandler);
+                        
+                        // Reset the form
+                        this.reset();
+                        alert('Schedule added successfully!');
+                    } else {
+                        alert('Could not find the corresponding cell in the schedule table.');
+                    }
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to add schedule.');
+            });
+        });
+    }
+    
+    // Helper function to find a specific schedule cell
+    function findScheduleCell(day, timeSlot) {
+        for (const cell of document.querySelectorAll('.schedule-cell')) {
+            if (getColumnDay(cell) === day && getRowTimeSlot(cell) === timeSlot) {
+                return cell;
+            }
+        }
+        return null;
+    }
+    
+    // Get the day from the column header
+    function getColumnDay(cell) {
+        const columnIndex = Array.from(cell.parentNode.children).indexOf(cell);
+        if (columnIndex <= 0) return null;
+        
+        const headerRow = document.querySelector('.schedule-table thead tr');
+        if (!headerRow) return null;
+        
+        return headerRow.children[columnIndex].textContent.trim();
+    }
+    
+    // Get the time slot from the row header
+    function getRowTimeSlot(cell) {
+        const row = cell.parentNode;
+        if (!row) return null;
+        
+        const firstCell = row.children[0];
+        if (!firstCell) return null;
+        
+        return firstCell.textContent.trim();
+    }
+    
+    // Function to handle delete button clicks
+    function deleteLabHandler(e) {
+        e.stopPropagation();
+        
+        const cell = this.closest('.schedule-cell');
+        const day = getColumnDay(cell);
+        const timeSlot = getRowTimeSlot(cell);
+        
+        if (!confirm(`Are you sure you want to remove this schedule for ${day} at ${timeSlot}?`)) {
+            return;
+        }
+        
+        fetch('/admin/delete_lab_schedule', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+            },
+            body: JSON.stringify({
+                day: day,
+                timeSlot: timeSlot
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                cell.classList.remove('has-lab');
+                cell.classList.add('available');
+                cell.innerHTML = 'Available';
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to delete schedule.');
+        });
+    }
+    
+    // Function to toggle availability
+    function toggleAvailability(cell, day, timeSlot, makeAvailable) {
+        fetch('/admin/toggle_schedule_availability', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+            },
+            body: JSON.stringify({
+                day: day,
+                timeSlot: timeSlot,
+                isAvailable: makeAvailable
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                if (makeAvailable) {
+                    cell.classList.remove('occupied');
+                    cell.classList.add('available');
+                    cell.textContent = 'Available';
+                } else {
+                    cell.classList.remove('available');
+                    cell.classList.add('occupied');
+                    cell.textContent = 'Occupied';
+                }
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to update schedule. Please try again.');
+        });
+    }
+});
+</script>
+
+<!-- Add this hidden element to store the schedules data -->
+<script id="schedules-data" type="application/json">
+{% if schedules is defined %}
+{{ schedules|tojson }}
+{% else %}
+[]
+{% endif %}
+</script>
+
+<!-- Add Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 {% endblock %}
